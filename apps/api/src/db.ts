@@ -1,16 +1,82 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import initSqlJs, { type Database, type SqlValue } from "sql.js";
 import { config } from "./config.js";
 
 fs.mkdirSync(path.dirname(config.databasePath), { recursive: true });
 
-export const db = new Database(config.databasePath);
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+let db: Database | null = null;
 
-export function migrate() {
-  db.exec(`
+export async function initializeDatabase() {
+  const SQL = await initSqlJs();
+  const existing = fs.existsSync(config.databasePath) ? fs.readFileSync(config.databasePath) : undefined;
+
+  db = existing ? new SQL.Database(existing) : new SQL.Database();
+  db.run("PRAGMA foreign_keys = ON");
+  migrate();
+  persistDatabase();
+}
+
+export function getDb() {
+  if (!db) {
+    throw new Error("Database has not been initialized");
+  }
+
+  return db;
+}
+
+export function persistDatabase() {
+  fs.writeFileSync(config.databasePath, Buffer.from(getDb().export()));
+}
+
+type SqlParams = Record<string, SqlValue>;
+
+export function all<T>(sql: string, params: SqlParams = {}) {
+  const stmt = getDb().prepare(sql);
+  const rows: T[] = [];
+
+  try {
+    stmt.bind(params);
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject() as T);
+    }
+  } finally {
+    stmt.free();
+  }
+
+  return rows;
+}
+
+export function get<T>(sql: string, params: SqlParams = {}) {
+  return all<T>(sql, params)[0];
+}
+
+export function run(sql: string, params: SqlParams = {}) {
+  const stmt = getDb().prepare(sql);
+
+  try {
+    stmt.run(params);
+  } finally {
+    stmt.free();
+  }
+}
+
+export function writeTransaction(callback: () => void) {
+  const database = getDb();
+  database.run("BEGIN");
+
+  try {
+    callback();
+    database.run("COMMIT");
+    persistDatabase();
+  } catch (error) {
+    database.run("ROLLBACK");
+    throw error;
+  }
+}
+
+function migrate() {
+  getDb().run(`
     CREATE TABLE IF NOT EXISTS travel_plans (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -36,4 +102,3 @@ export function migrate() {
       ON travel_rows(plan_id, sort_order);
   `);
 }
-

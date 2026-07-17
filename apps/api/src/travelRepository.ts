@@ -6,7 +6,7 @@ import type {
   TravelRow,
   UpdateTravelRowInput
 } from "@homeos/shared";
-import { db } from "./db.js";
+import { all, get, run, writeTransaction } from "./db.js";
 import { enumerateDates } from "./dateRange.js";
 
 interface PlanRecord {
@@ -30,9 +30,8 @@ interface RowRecord {
 }
 
 export function listTravelPlans(): TravelPlanSummary[] {
-  const rows = db
-    .prepare(
-      `
+  const rows = all<PlanRecord>(
+    `
       SELECT
         p.id,
         p.title,
@@ -45,21 +44,18 @@ export function listTravelPlans(): TravelPlanSummary[] {
       GROUP BY p.id
       ORDER BY p.updated_at DESC
     `
-    )
-    .all() as PlanRecord[];
+  );
 
   return rows.map(mapPlanSummary);
 }
 
 export function getTravelPlan(id: string): TravelPlan | null {
-  const plan = db.prepare("SELECT * FROM travel_plans WHERE id = ?").get(id) as PlanRecord | undefined;
+  const plan = get<PlanRecord>("SELECT * FROM travel_plans WHERE id = :id", { ":id": id });
   if (!plan) {
     return null;
   }
 
-  const rows = db
-    .prepare("SELECT * FROM travel_rows WHERE plan_id = ? ORDER BY sort_order ASC")
-    .all(id) as RowRecord[];
+  const rows = all<RowRecord>("SELECT * FROM travel_rows WHERE plan_id = :id ORDER BY sort_order ASC", { ":id": id });
 
   return {
     ...mapPlanSummary({ ...plan, row_count: rows.length }),
@@ -72,37 +68,37 @@ export function createTravelPlan(input: CreateTravelPlanInput): TravelPlan {
   const id = randomUUID();
   const dates = enumerateDates(input.startDate, input.endDate);
 
-  const insertPlan = db.prepare(`
-    INSERT INTO travel_plans (id, title, start_date, end_date, created_at, updated_at)
-    VALUES (@id, @title, @startDate, @endDate, @now, @now)
-  `);
-
-  const insertRow = db.prepare(`
-    INSERT INTO travel_rows (id, plan_id, date, theme, hotel, notes, sort_order, created_at, updated_at)
-    VALUES (@id, @planId, @date, '', '', '', @sortOrder, @now, @now)
-  `);
-
-  const write = db.transaction(() => {
-    insertPlan.run({
-      id,
-      title: input.title.trim(),
-      startDate: input.startDate,
-      endDate: input.endDate,
-      now
-    });
+  writeTransaction(() => {
+    run(
+      `
+      INSERT INTO travel_plans (id, title, start_date, end_date, created_at, updated_at)
+      VALUES (:id, :title, :startDate, :endDate, :now, :now)
+    `,
+      {
+        ":id": id,
+        ":title": input.title.trim(),
+        ":startDate": input.startDate,
+        ":endDate": input.endDate,
+        ":now": now
+      }
+    );
 
     dates.forEach((date, index) => {
-      insertRow.run({
-        id: randomUUID(),
-        planId: id,
-        date,
-        sortOrder: index,
-        now
-      });
+      run(
+        `
+        INSERT INTO travel_rows (id, plan_id, date, theme, hotel, notes, sort_order, created_at, updated_at)
+        VALUES (:id, :planId, :date, '', '', '', :sortOrder, :now, :now)
+      `,
+        {
+          ":id": randomUUID(),
+          ":planId": id,
+          ":date": date,
+          ":sortOrder": index,
+          ":now": now
+        }
+      );
     });
   });
-
-  write();
 
   const plan = getTravelPlan(id);
   if (!plan) {
@@ -112,7 +108,7 @@ export function createTravelPlan(input: CreateTravelPlanInput): TravelPlan {
 }
 
 export function updateTravelRow(id: string, input: UpdateTravelRowInput): TravelRow | null {
-  const row = db.prepare("SELECT * FROM travel_rows WHERE id = ?").get(id) as RowRecord | undefined;
+  const row = get<RowRecord>("SELECT * FROM travel_rows WHERE id = :id", { ":id": id });
   if (!row) {
     return null;
   }
@@ -125,25 +121,33 @@ export function updateTravelRow(id: string, input: UpdateTravelRowInput): Travel
     id
   };
 
-  db.transaction(() => {
-    db.prepare(
+  writeTransaction(() => {
+    run(
       `
       UPDATE travel_rows
       SET theme = @theme, hotel = @hotel, notes = @notes, updated_at = @updatedAt
       WHERE id = @id
-    `
-    ).run(next);
+    `,
+      {
+        "@theme": next.theme,
+        "@hotel": next.hotel,
+        "@notes": next.notes,
+        "@updatedAt": next.updatedAt,
+        "@id": next.id
+      }
+    );
 
-    db.prepare(
+    run(
       `
       UPDATE travel_plans
       SET updated_at = @updatedAt
       WHERE id = @planId
-    `
-    ).run({ updatedAt: next.updatedAt, planId: row.plan_id });
-  })();
+    `,
+      { "@updatedAt": next.updatedAt, "@planId": row.plan_id }
+    );
+  });
 
-  const updated = db.prepare("SELECT * FROM travel_rows WHERE id = ?").get(id) as RowRecord;
+  const updated = get<RowRecord>("SELECT * FROM travel_rows WHERE id = :id", { ":id": id });
   return mapTravelRow(updated);
 }
 
@@ -170,4 +174,3 @@ function mapTravelRow(record: RowRecord): TravelRow {
     updatedAt: record.updated_at
   };
 }
-

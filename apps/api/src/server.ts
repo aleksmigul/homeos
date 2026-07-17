@@ -3,10 +3,8 @@ import express from "express";
 import { ZodError } from "zod";
 import { config } from "./config.js";
 import { optionalPasswordGate } from "./auth.js";
-import { migrate } from "./db.js";
+import { initializeDatabase } from "./db.js";
 import { travelRouter } from "./routes/travel.js";
-
-migrate();
 
 const app = express();
 
@@ -33,6 +31,13 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
   res.status(500).json({ error: "Unexpected server error" });
 });
 
-app.listen(config.port, () => {
-  console.log(`homeOS API listening on http://localhost:${config.port}`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(config.port, () => {
+      console.log(`homeOS API listening on http://localhost:${config.port}`);
+    });
+  })
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exit(1);
+  });
