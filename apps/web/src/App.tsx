@@ -1,11 +1,10 @@
 import { CalendarPlus, ChevronRight, Home, Loader2, NotebookPen, Plane, Plus, Save } from "lucide-react";
-import { FormEvent, Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getTravelPlan, listTravelPlans, updateTravelRow } from "./api";
-import "@uiw/react-md-editor/markdown-editor.css";
+import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 
 const today = new Date().toISOString().slice(0, 10);
-const MarkdownEditor = lazy(() => import("@uiw/react-md-editor"));
 
 export function App() {
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
@@ -265,19 +264,11 @@ function RowPage({
       </label>
       <div className="notes-label">
         <span className="field-label">Notes</span>
-        <div className="markdown-editor" data-color-mode="light" onBlur={() => void onSave(row)}>
-          <Suspense fallback={<div className="editor-loading">Loading editor...</div>}>
-            <MarkdownEditor
-              value={row.notes}
-              height={360}
-              preview="edit"
-              textareaProps={{
-                placeholder: "# Ideas\n- Dinner reservation\n- Transit notes"
-              }}
-              onChange={(value) => onChange(row.id, { notes: value ?? "" })}
-            />
-          </Suspense>
-        </div>
+        <MarkdownNotesEditor
+          value={row.notes}
+          onChange={(notes) => onChange(row.id, { notes })}
+          onCommit={(notes) => void onSave({ ...row, notes })}
+        />
       </div>
     </aside>
   );
