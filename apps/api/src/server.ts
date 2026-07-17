@@ -34,7 +34,7 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 initializeDatabase()
   .then(() => {
     app.listen(config.port, () => {
-      console.log(`homeOS API listening on http://localhost:${config.port}`);
+      console.log(`The Annexation API listening on http://localhost:${config.port}`);
     });
   })
   .catch((error: unknown) => {

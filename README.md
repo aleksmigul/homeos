@@ -1,4 +1,4 @@
-# homeOS
+# The Annexation
 
 A small local-first household web app. The first module is a travel planner, with room for notes, todos, and future Notion imports.
 

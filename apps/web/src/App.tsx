@@ -106,7 +106,7 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <Home size={18} />
-          <span>homeOS</span>
+          <span>The Annexation</span>
         </div>
         <button className="new-button" type="button" onClick={() => setIsCreateOpen(true)}>
           <Plus size={16} />
