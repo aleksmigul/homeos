@@ -1,9 +1,11 @@
 import { CalendarPlus, ChevronRight, Home, Loader2, NotebookPen, Plane, Plus, Save } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getTravelPlan, listTravelPlans, updateTravelRow } from "./api";
+import "@uiw/react-md-editor/markdown-editor.css";
 
 const today = new Date().toISOString().slice(0, 10);
+const MarkdownEditor = lazy(() => import("@uiw/react-md-editor"));
 
 export function App() {
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
@@ -188,7 +190,10 @@ function TravelTable({
           type="button"
           onClick={() => onSelect(row.id)}
         >
-          <span className="date-cell">{formatDate(row.date)}</span>
+          <span className="date-cell">
+            <strong>{formatWeekday(row.date)}</strong>
+            <small>{formatDate(row.date)}</small>
+          </span>
           <input
             aria-label={`Theme for ${row.date}`}
             value={row.theme}
@@ -234,7 +239,9 @@ function RowPage({
       <div className="row-page-title">
         <CalendarPlus size={18} />
         <div>
-          <p>{formatDate(row.date)}</p>
+          <p>
+            {formatWeekday(row.date)}, {formatDate(row.date)}
+          </p>
           <h2>{row.theme || "Untitled day"}</h2>
         </div>
       </div>
@@ -256,15 +263,22 @@ function RowPage({
           onBlur={() => void onSave(row)}
         />
       </label>
-      <label className="notes-label">
-        Notes
-        <textarea
-          value={row.notes}
-          placeholder="# Ideas&#10;- Dinner reservation&#10;- Transit notes"
-          onChange={(event) => onChange(row.id, { notes: event.target.value })}
-          onBlur={() => void onSave(row)}
-        />
-      </label>
+      <div className="notes-label">
+        <span className="field-label">Notes</span>
+        <div className="markdown-editor" data-color-mode="light" onBlur={() => void onSave(row)}>
+          <Suspense fallback={<div className="editor-loading">Loading editor...</div>}>
+            <MarkdownEditor
+              value={row.notes}
+              height={360}
+              preview="edit"
+              textareaProps={{
+                placeholder: "# Ideas\n- Dinner reservation\n- Transit notes"
+              }}
+              onChange={(value) => onChange(row.id, { notes: value ?? "" })}
+            />
+          </Suspense>
+        </div>
+      </div>
     </aside>
   );
 }
@@ -341,3 +355,6 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T00:00:00`));
 }
 
+function formatWeekday(value: string) {
+  return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${value}T00:00:00`));
+}
