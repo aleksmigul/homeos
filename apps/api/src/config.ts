@@ -11,4 +11,3 @@ export const config = {
   databasePath: path.resolve(repoRoot, process.env.DATABASE_PATH ?? "data/homeos.db"),
   homePassword: process.env.HOMEOS_PASSWORD ?? ""
 };
-

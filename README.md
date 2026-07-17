@@ -18,6 +18,8 @@ pnpm dev
 
 The web app runs on `http://localhost:5173` and proxies API requests to `http://localhost:4000`.
 
+Set `HOMEOS_PASSWORD` in `.env` if you want the API to require a shared password header later. It is empty by default for local development.
+
 ## Architecture Notes
 
 - `apps/web` contains the React app and user-facing modules.
@@ -30,4 +32,3 @@ The web app runs on `http://localhost:5173` and proxies API requests to `http://
 - Notes and todo lists can be added as new modules alongside travel.
 - The Notion importer should live in `apps/api/src/importers/notion` and write into the same domain-oriented tables used by the app.
 - Authentication is intentionally simple for now because this is a two-person local app. Google OAuth can be added later without changing the travel data model.
-

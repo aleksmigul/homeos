@@ -3,12 +3,11 @@
   "compilerOptions": {
     "declaration": true,
     "emitDeclarationOnly": false,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "noEmit": false,
     "outDir": "dist",
     "rootDir": "src"
   },
   "include": ["src"]
 }
-

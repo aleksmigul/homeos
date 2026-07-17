@@ -6,11 +6,10 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @homeos/api --filter @homeos/web dev",
     "build": "pnpm --filter @homeos/shared build && pnpm --filter @homeos/api build && pnpm --filter @homeos/web build",
-    "check": "pnpm --recursive check"
+    "check": "pnpm --filter @homeos/shared build && pnpm --recursive check"
   },
   "packageManager": "pnpm@11.9.0",
   "devDependencies": {
     "typescript": "^5.9.3"
   }
 }
-
