@@ -145,6 +145,15 @@ button {
   gap: 4px;
 }
 
+.sidebar-content {
+  display: contents;
+}
+
+.mobile-menu-toggle,
+.mobile-menu-label {
+  display: none;
+}
+
 .module-nav button {
   align-items: center;
   background: transparent;
@@ -996,9 +1005,6 @@ label {
 
   .brand { padding: 0; }
   .brand span { font-size: 14px; }
-  .new-button,
-  .plan-list { display: none; }
-
   .account-card {
     border: 0;
     margin: 0 0 0 auto;
@@ -1008,30 +1014,59 @@ label {
   .account-card span { display: none; }
   .account-card img { height: 30px; width: 30px; }
 
-  .module-nav {
-    background: #fffdf8;
-    border-top: 1px solid #ddd7cd;
+  .mobile-menu-toggle {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #4f4a43;
+    display: flex;
+    height: 40px;
+    justify-content: center;
+    order: 3;
+    padding: 0;
+    width: 40px;
+  }
+
+  .sidebar-content {
+    background: #f5f1e9;
     bottom: 0;
-    display: grid;
-    gap: 0;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     left: 0;
-    padding: 5px max(16px, env(safe-area-inset-left)) max(5px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+    opacity: 0;
+    overflow-y: auto;
+    padding: 24px 18px max(24px, env(safe-area-inset-bottom));
+    pointer-events: none;
     position: fixed;
     right: 0;
-    z-index: 20;
+    top: 58px;
+    transform: translateY(-8px);
+    transition: opacity 140ms ease, transform 140ms ease;
+    z-index: 19;
   }
 
+  .mobile-menu-open .sidebar-content { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .mobile-menu-label { color: #958c80; display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; margin: 0 4px -4px; text-transform: uppercase; }
+
+  .module-nav { display: grid; gap: 7px; }
   .module-nav button {
-    flex-direction: column;
-    font-size: 11px;
-    gap: 2px;
-    justify-content: center;
-    min-height: 50px;
-    padding: 4px;
+    background: #fffdf8;
+    border: 1px solid #e0d9ce;
+    border-radius: 11px;
+    flex-direction: row;
+    font-size: 15px;
+    gap: 11px;
+    justify-content: flex-start;
+    min-height: 54px;
+    padding: 11px 14px;
   }
 
-  .workspace { min-height: calc(100dvh - 58px); padding-bottom: 60px; }
+  .module-nav button.active { border-color: #a9beb5; }
+  .sidebar-content .new-button { flex: 0 0 auto; min-height: 46px; }
+  .sidebar-content .plan-list { display: flex; }
+
+  .workspace { min-height: calc(100dvh - 58px); padding-bottom: 0; }
 
   .topbar {
     align-items: flex-start;
@@ -1059,7 +1094,7 @@ label {
   .detail-title h1 { font-size: 21px; }
   .checklist-detail-layout { padding: 20px 16px 40px; }
   .template-item { min-height: 55px; }
-  .run-button { bottom: 70px; box-shadow: 0 8px 26px rgb(40 70 60 / 25%); position: sticky; }
+  .run-button { bottom: 16px; box-shadow: 0 8px 26px rgb(40 70 60 / 25%); position: sticky; }
 
   .run-workspace { padding-bottom: 0; }
   .run-header { gap: 10px; grid-template-columns: 42px minmax(0, 1fr) auto; min-height: 92px; padding: 14px 16px; }
