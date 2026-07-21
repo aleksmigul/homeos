@@ -8,3 +8,4 @@ dist/
 *.err
 data/*.db
 data/*.db-*
+.release/

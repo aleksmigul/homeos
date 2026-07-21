@@ -31,10 +31,13 @@ Environment defaults live in `.env.example`:
 ```text
 API_PORT=4000
 DATABASE_PATH=./data/homeos.db
-HOMEOS_PASSWORD=
+GOOGLE_CLIENT_ID=
+AUTH_ALLOWED_EMAILS=you@example.com
+AUTH_SESSION_SECRET=
 ```
 
-`HOMEOS_PASSWORD` is optional. When set, API requests need the `x-homeos-password` header.
+Google Sign-In is required for application routes. Only verified accounts listed
+in `AUTH_ALLOWED_EMAILS` can create a signed session cookie.
 
 ## Important Implementation Notes
 
@@ -45,21 +48,16 @@ HOMEOS_PASSWORD=
 - The first rich editor attempt used `@uiw/react-md-editor`, but it was glitchy and heavy. It was replaced with `apps/web/src/components/MarkdownNotesEditor.tsx`, a controlled textarea plus toolbar and `react-markdown` preview.
 - Existing local test data may include trips like Hawaii/Seattle in `data/homeos.db`, but that DB is not pushed.
 
-## Hostinger/VPS Notes
+## Production
 
-- This is not deployment-packaged yet.
-- For a VPS, likely next steps are:
-  - install Node.js and pnpm;
-  - run `pnpm install` and `pnpm build`;
-  - run API with `node apps/api/dist/server.js`;
-  - serve `apps/web/dist` with nginx or another static server;
-  - proxy `/api` to the API process;
-  - use systemd or pm2 for the API;
-  - set `DATABASE_PATH` to a persistent location outside build artifacts.
+- Production runs from `/srv/homeos` behind nginx.
+- The API runs as the unprivileged `homeos` account and listens on loopback only.
+- The database is `/var/lib/homeos/homeos.db`.
+- Secrets are stored in `/etc/homeos.env`.
+- Operational templates, deployment instructions, and backup details are in `ops/`.
 
 ## Recent Decisions
 
 - Commits were intentionally kept small/coherent.
 - The app was published to the private GitHub repo on `main`.
 - The visible app name is **The Annexation** in the sidebar, browser title, README, and API startup log.
-

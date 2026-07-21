@@ -1,0 +1,13 @@
+[Unit]
+Description=Back up the HomeOS database
+RequiresMountsFor=/var/backups/homeos /var/lib/homeos
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homeos-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+UMask=0077
