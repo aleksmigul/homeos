@@ -140,5 +140,21 @@ function migrate() {
       ON checklist_runs(checklist_id, started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_checklist_run_items_order
       ON checklist_run_items(run_id, sort_order);
+
+    CREATE TABLE IF NOT EXISTS travel_emails (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL UNIQUE,
+      sender TEXT NOT NULL,
+      recipients_json TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      text_body TEXT,
+      html_body TEXT,
+      received_at TEXT NOT NULL,
+      attachments_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_travel_emails_received
+      ON travel_emails(received_at DESC);
   `);
 }

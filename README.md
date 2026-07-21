@@ -36,6 +36,7 @@ Production secrets belong in `/etc/homeos.env`, never in this repository.
 - **Checklists** creates reusable task templates, starts focused checklist runs,
   and keeps immutable run history.
 - **Travel** organizes trip days, accommodations, and Markdown notes.
+  Its inbox receives forwarded confirmations through a signed Resend webhook.
 
 ## Production
 

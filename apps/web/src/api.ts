@@ -7,6 +7,7 @@ import type {
   CreateTravelPlanInput,
   TravelPlan,
   TravelPlanSummary,
+  TravelEmail,
   TravelRow,
   UpdateChecklistInput,
   UpdateTravelRowInput
@@ -71,6 +72,10 @@ export async function updateTravelRow(id: string, input: UpdateTravelRowInput) {
     method: "PATCH",
     body: JSON.stringify(input)
   });
+}
+
+export async function getTravelInbox() {
+  return request<{ address: string; configured: boolean; emails: TravelEmail[] }>("/api/travel-inbox");
 }
 
 export async function listChecklists() {

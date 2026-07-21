@@ -1,9 +1,10 @@
-import { CalendarPlus, ChevronRight, Home, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
+import { CalendarPlus, ChevronRight, Home, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
+import { TravelInbox } from "./TravelInbox";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -31,6 +32,7 @@ export function App() {
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [activeModule, setActiveModule] = useState<"travel" | "checklists">("checklists");
+  const [travelView, setTravelView] = useState<"plans" | "inbox">("plans");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
@@ -174,21 +176,21 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
       {activeModule === "checklists" ? <ChecklistModule /> : <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Travel planner</p>
-            <h1>{selectedPlan?.title ?? "No trips yet"}</h1>
+            <p className="eyebrow">Travel</p>
+            <h1>{travelView === "inbox" ? "Inbox" : selectedPlan?.title ?? "No trips yet"}</h1>
           </div>
-          <div className="topbar-actions"><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></div>
+          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => setTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => setTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
         </header>
 
-        <nav className="mobile-plan-strip" aria-label="Travel plans">
+        {travelView === "plans" ? <nav className="mobile-plan-strip" aria-label="Travel plans">
           {plans.map((plan) => (
             <button className={plan.id === selectedPlan?.id ? "active" : ""} key={plan.id} type="button" onClick={() => void loadPlan(plan.id)}>
               {plan.title}
             </button>
           ))}
-        </nav>
+        </nav> : null}
 
-        {selectedPlan ? (
+        {travelView === "inbox" ? <TravelInbox /> : selectedPlan ? (
           <div className="planner-grid">
             <TravelTable
               rows={selectedPlan.rows}

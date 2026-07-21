@@ -37,3 +37,20 @@ export interface UpdateTravelRowInput {
   notes?: string;
 }
 
+export interface TravelEmailAttachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+}
+
+export interface TravelEmail {
+  id: string;
+  sender: string;
+  recipients: string[];
+  subject: string;
+  text: string | null;
+  html: string | null;
+  receivedAt: ISODateTime;
+  attachments: TravelEmailAttachment[];
+}

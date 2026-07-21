@@ -4,6 +4,11 @@ The production application runs from `/srv/homeos`; the mutable database is
 stored separately at `/var/lib/homeos/homeos.db`. Do not develop directly in
 `/srv/homeos` or run the application as root.
 
+Production secrets in `/etc/homeos.env` include Google authentication plus the
+optional inbound Travel email integration: `RESEND_API_KEY`,
+`RESEND_WEBHOOK_SECRET`, and `TRAVEL_INBOX_ADDRESS`. Resend should deliver
+`email.received` events to `https://os.theannexation.fun/api/webhooks/resend`.
+
 ## Deploy
 
 Prepare a release as your normal development user, then activate it with the

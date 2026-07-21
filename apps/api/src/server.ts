@@ -5,11 +5,14 @@ import { config } from "./config.js";
 import { authRouter, requireAuth } from "./auth.js";
 import { initializeDatabase } from "./db.js";
 import { checklistRouter } from "./routes/checklists.js";
+import { travelInboxRouter } from "./routes/travelInbox.js";
 import { travelRouter } from "./routes/travel.js";
+import { receiveResendWebhook } from "./resendWebhook.js";
 
 const app = express();
 
 app.use(cors({ origin: "http://localhost:5173" }));
+app.post("/api/webhooks/resend", express.raw({ type: "application/json", limit: "2mb" }), receiveResendWebhook);
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -17,7 +20,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", authRouter);
-app.use("/api", requireAuth, checklistRouter, travelRouter);
+app.use("/api", requireAuth, checklistRouter, travelInboxRouter, travelRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {
