@@ -48,15 +48,14 @@ button {
   width: 100%;
 }
 
-.login-mark {
-  align-items: center;
-  background: #35658f;
+.login-app-mark {
   border-radius: 12px;
-  color: white;
-  display: inline-flex;
-  justify-content: center;
+  display: block;
+  height: 52px;
   margin-bottom: 20px;
-  padding: 12px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 52px;
 }
 
 .login-copy {
@@ -138,6 +137,13 @@ button {
   font-size: 15px;
   font-weight: 700;
   padding: 0 8px;
+}
+
+.app-mark {
+  border-radius: 6px;
+  flex: 0 0 auto;
+  height: 24px;
+  width: 24px;
 }
 
 .module-nav {

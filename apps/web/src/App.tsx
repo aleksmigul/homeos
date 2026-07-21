@@ -1,4 +1,4 @@
-import { CalendarPlus, ChevronRight, Home, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
+import { CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
@@ -131,7 +131,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     <main className="shell">
       <aside className={isMobileMenuOpen ? "sidebar mobile-menu-open" : "sidebar"}>
         <div className="brand">
-          <Home size={18} />
+          <img className="app-mark" src="/favicon.png" alt="" />
           <span>The Annexation</span>
         </div>
         <button className="mobile-menu-toggle" type="button" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={isMobileMenuOpen} onClick={() => setIsMobileMenuOpen((open) => !open)}>
@@ -255,7 +255,7 @@ function LoginPage({ clientId, error, onError, onSignIn }: {
   return (
     <main className="auth-page">
       <section className="login-card">
-        <div className="login-mark"><Home size={24} /></div>
+        <img className="login-app-mark" src="/favicon.png" alt="" />
         <p className="eyebrow">Welcome home</p>
         <h1>The Annexation</h1>
         <p className="login-copy">Sign in with an approved Google account.</p>
