@@ -1,4 +1,16 @@
-import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow, UpdateTravelRowInput } from "@homeos/shared";
+import type {
+  Checklist,
+  ChecklistRun,
+  ChecklistRunItem,
+  ChecklistSummary,
+  CreateChecklistInput,
+  CreateTravelPlanInput,
+  TravelPlan,
+  TravelPlanSummary,
+  TravelRow,
+  UpdateChecklistInput,
+  UpdateTravelRowInput
+} from "@homeos/shared";
 
 export type AuthUser = { email: string; name: string; picture?: string };
 
@@ -59,4 +71,39 @@ export async function updateTravelRow(id: string, input: UpdateTravelRowInput) {
     method: "PATCH",
     body: JSON.stringify(input)
   });
+}
+
+export async function listChecklists() {
+  return request<{ checklists: ChecklistSummary[] }>("/api/checklists");
+}
+
+export async function getChecklist(id: string) {
+  return request<{ checklist: Checklist }>(`/api/checklists/${id}`);
+}
+
+export async function createChecklist(input: CreateChecklistInput) {
+  return request<{ checklist: Checklist }>("/api/checklists", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function updateChecklist(id: string, input: UpdateChecklistInput) {
+  return request<{ checklist: Checklist }>(`/api/checklists/${id}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export async function startChecklistRun(id: string) {
+  return request<{ checklistRun: ChecklistRun }>(`/api/checklists/${id}/runs`, { method: "POST" });
+}
+
+export async function getChecklistRun(id: string) {
+  return request<{ checklistRun: ChecklistRun }>(`/api/checklist-runs/${id}`);
+}
+
+export async function updateChecklistRunItem(id: string, checked: boolean) {
+  return request<{ item: ChecklistRunItem }>(`/api/checklist-run-items/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ checked })
+  });
+}
+
+export async function completeChecklistRun(id: string) {
+  return request<{ checklistRun: ChecklistRun }>(`/api/checklist-runs/${id}/complete`, { method: "POST" });
 }

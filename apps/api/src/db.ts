@@ -100,5 +100,45 @@ function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_travel_rows_plan_order
       ON travel_rows(plan_id, sort_order);
+
+    CREATE TABLE IF NOT EXISTS checklists (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS checklist_items (
+      id TEXT PRIMARY KEY,
+      checklist_id TEXT NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS checklist_runs (
+      id TEXT PRIMARY KEY,
+      checklist_id TEXT NOT NULL REFERENCES checklists(id) ON DELETE RESTRICT,
+      checklist_title TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS checklist_run_items (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES checklist_runs(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      is_checked INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL,
+      checked_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_checklist_items_order
+      ON checklist_items(checklist_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_checklist_runs_started
+      ON checklist_runs(checklist_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_checklist_run_items_order
+      ON checklist_run_items(run_id, sort_order);
   `);
 }

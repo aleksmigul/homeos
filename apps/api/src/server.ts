@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { config } from "./config.js";
 import { authRouter, requireAuth } from "./auth.js";
 import { initializeDatabase } from "./db.js";
+import { checklistRouter } from "./routes/checklists.js";
 import { travelRouter } from "./routes/travel.js";
 
 const app = express();
@@ -16,7 +17,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", authRouter);
-app.use("/api", requireAuth, travelRouter);
+app.use("/api", requireAuth, checklistRouter, travelRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {

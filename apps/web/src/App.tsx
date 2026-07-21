@@ -1,8 +1,9 @@
-import { CalendarPlus, ChevronRight, Home, Loader2, LogOut, NotebookPen, Plane, Plus, Save } from "lucide-react";
+import { CalendarPlus, ChevronRight, Home, ListChecks, Loader2, LogOut, NotebookPen, Plane, Plus, Save } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
+import { ChecklistModule } from "./ChecklistModule";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -29,6 +30,7 @@ export function App() {
 }
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
+  const [activeModule, setActiveModule] = useState<"travel" | "checklists">("checklists");
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -129,11 +131,15 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <Home size={18} />
           <span>The Annexation</span>
         </div>
-        <button className="new-button" type="button" onClick={() => setIsCreateOpen(true)}>
+        <nav className="module-nav" aria-label="Modules">
+          <button className={activeModule === "checklists" ? "active" : ""} onClick={() => setActiveModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
+          <button className={activeModule === "travel" ? "active" : ""} onClick={() => setActiveModule("travel")}><Plane size={17} /><span>Travel</span></button>
+        </nav>
+        {activeModule === "travel" ? <button className="new-button" type="button" onClick={() => setIsCreateOpen(true)}>
           <Plus size={16} />
           New travel
-        </button>
-        <nav className="plan-list" aria-label="Travel plans">
+        </button> : null}
+        {activeModule === "travel" ? <nav className="plan-list" aria-label="Travel plans">
           {plans.map((plan) => (
             <button
               className={plan.id === selectedPlan?.id ? "plan-link active" : "plan-link"}
@@ -150,7 +156,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
               </span>
             </button>
           ))}
-        </nav>
+        </nav> : null}
         <div className="account-card">
           {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : null}
           <span><strong>{user.name}</strong><small>{user.email}</small></span>
@@ -158,14 +164,22 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      <section className="workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : <section className="workspace">
         <header className="topbar">
           <div>
             <p className="eyebrow">Travel planner</p>
             <h1>{selectedPlan?.title ?? "No trips yet"}</h1>
           </div>
-          <div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div>
+          <div className="topbar-actions"><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></div>
         </header>
+
+        <nav className="mobile-plan-strip" aria-label="Travel plans">
+          {plans.map((plan) => (
+            <button className={plan.id === selectedPlan?.id ? "active" : ""} key={plan.id} type="button" onClick={() => void loadPlan(plan.id)}>
+              {plan.title}
+            </button>
+          ))}
+        </nav>
 
         {selectedPlan ? (
           <div className="planner-grid">
@@ -181,7 +195,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         ) : (
           <EmptyState onCreate={() => setIsCreateOpen(true)} />
         )}
-      </section>
+      </section>}
 
       {isCreateOpen ? <CreateTravelDialog onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} /> : null}
     </main>

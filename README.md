@@ -31,6 +31,12 @@ Production secrets belong in `/etc/homeos.env`, never in this repository.
 - `packages/shared` contains types shared between the frontend and backend.
 - `data/` is used for the local SQLite database and is intentionally ignored by Git.
 
+## Modules
+
+- **Checklists** creates reusable task templates, starts focused checklist runs,
+  and keeps immutable run history.
+- **Travel** organizes trip days, accommodations, and Markdown notes.
+
 ## Production
 
 Production runs from `/srv/homeos` as the unprivileged `homeos` user. Nginx serves

@@ -10,7 +10,7 @@ This repo is the local-first household app formerly scaffolded as `homeOS`; the 
 - Backend: Express + TypeScript in `apps/api`.
 - Persistence: SQLite database file at `data/homeos.db`, implemented with `sql.js` for portability.
 - Shared types: `packages/shared`.
-- Current user-facing module: travel planner.
+- Current user-facing modules: reusable checklists and travel planner.
 
 ## Local Commands
 
@@ -44,6 +44,8 @@ in `AUTH_ALLOWED_EMAILS` can create a signed session cookie.
 - The `@homeos/*` package names remain internal; do not rename them unless you want a lockfile/import cleanup pass.
 - `data/*.db` is ignored by Git. Production or VPS setup needs a persistent writable `data/` directory, or a deliberate DB path in `DATABASE_PATH`.
 - The travel planner pre-fills one row per date when a plan is created.
+- Checklist runs snapshot their template items, so later template edits do not
+  rewrite historical runs.
 - Travel row notes are stored as Markdown text in the existing `notes` column.
 - The first rich editor attempt used `@uiw/react-md-editor`, but it was glitchy and heavy. It was replaced with `apps/web/src/components/MarkdownNotesEditor.tsx`, a controlled textarea plus toolbar and `react-markdown` preview.
 - Existing local test data may include trips like Hawaii/Seattle in `data/homeos.db`, but that DB is not pushed.
