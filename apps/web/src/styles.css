@@ -28,6 +28,54 @@ button {
   cursor: pointer;
 }
 
+.auth-page {
+  align-items: center;
+  background: #ede8df;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.login-card {
+  background: #fffaf1;
+  border: 1px solid #ddd5c9;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgb(61 51 39 / 10%);
+  max-width: 420px;
+  padding: 42px;
+  text-align: center;
+  width: 100%;
+}
+
+.login-mark {
+  align-items: center;
+  background: #2f5d50;
+  border-radius: 12px;
+  color: white;
+  display: inline-flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  padding: 12px;
+}
+
+.login-copy {
+  color: #746d62;
+  margin: 12px 0 24px;
+}
+
+.google-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.auth-error {
+  color: #a14436;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -42,6 +90,37 @@ button {
   gap: 18px;
   padding: 18px 14px;
 }
+
+.account-card {
+  align-items: center;
+  border-top: 1px solid #ddd5c9;
+  display: flex;
+  gap: 9px;
+  margin-top: auto;
+  padding: 14px 4px 0;
+}
+
+.account-card img {
+  border-radius: 50%;
+  height: 32px;
+  width: 32px;
+}
+
+.account-card span {
+  display: grid;
+  min-width: 0;
+}
+
+.account-card strong,
+.account-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-card strong { font-size: 12px; }
+.account-card small { color: #7d756a; font-size: 10px; }
+.account-card button { background: transparent; border: 0; color: #746d62; margin-left: auto; padding: 5px; }
 
 .brand,
 .new-button,

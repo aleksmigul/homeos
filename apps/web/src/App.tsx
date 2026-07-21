@@ -1,12 +1,34 @@
-import { CalendarPlus, ChevronRight, Home, Loader2, NotebookPen, Plane, Plus, Save } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CalendarPlus, ChevronRight, Home, Loader2, LogOut, NotebookPen, Plane, Plus, Save } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
-import { createTravelPlan, getTravelPlan, listTravelPlans, updateTravelRow } from "./api";
+import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export function App() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [clientId, setClientId] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    Promise.all([getAuthConfig(), getCurrentUser().catch(() => null)])
+      .then(([config, current]) => {
+        setClientId(config.googleClientId);
+        setUser(current?.user ?? null);
+      })
+      .catch((error: unknown) => setAuthError(error instanceof Error ? error.message : "Authentication failed"))
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  if (authLoading) return <AuthLoading />;
+  if (!user) return <LoginPage clientId={clientId} error={authError} onError={setAuthError} onSignIn={setUser} />;
+
+  return <Planner user={user} onLogout={() => logout().then(() => setUser(null))} />;
+}
+
+function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -129,6 +151,11 @@ export function App() {
             </button>
           ))}
         </nav>
+        <div className="account-card">
+          {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : null}
+          <span><strong>{user.name}</strong><small>{user.email}</small></span>
+          <button type="button" aria-label="Sign out" onClick={onLogout}><LogOut size={16} /></button>
+        </div>
       </aside>
 
       <section className="workspace">
@@ -157,6 +184,61 @@ export function App() {
       </section>
 
       {isCreateOpen ? <CreateTravelDialog onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} /> : null}
+    </main>
+  );
+}
+
+function AuthLoading() {
+  return <main className="auth-page"><Loader2 className="spin" size={28} /></main>;
+}
+
+function LoginPage({ clientId, error, onError, onSignIn }: {
+  clientId: string;
+  error: string;
+  onError: (message: string) => void;
+  onSignIn: (user: AuthUser) => void;
+}) {
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!clientId) return;
+    const initialize = () => {
+      const google = window.google;
+      if (!google || !buttonRef.current) return;
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: ({ credential }) => {
+          signInWithGoogle(credential).then(({ user }) => onSignIn(user)).catch((cause: unknown) => {
+            onError(cause instanceof Error ? cause.message : "Sign in failed");
+          });
+        }
+      });
+      google.accounts.id.renderButton(buttonRef.current, { theme: "outline", size: "large", width: 280 });
+    };
+
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      if (window.google) initialize(); else existing.addEventListener("load", initialize, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = initialize;
+    script.onerror = () => onError("Could not load Google Sign-In");
+    document.head.appendChild(script);
+  }, [clientId, onError, onSignIn]);
+
+  return (
+    <main className="auth-page">
+      <section className="login-card">
+        <div className="login-mark"><Home size={24} /></div>
+        <p className="eyebrow">Welcome home</p>
+        <h1>The Annexation</h1>
+        <p className="login-copy">Sign in with an approved Google account.</p>
+        {clientId ? <div ref={buttonRef} className="google-button" /> : <p className="auth-error">Google Sign-In still needs its client ID.</p>}
+        {error ? <p className="auth-error">{error}</p> : null}
+      </section>
     </main>
   );
 }
