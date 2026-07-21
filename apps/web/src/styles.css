@@ -1081,7 +1081,14 @@ label {
   }
 
   .checklist-topbar h1 { font-size: 27px; }
-  .checklist-topbar .touch-button { font-size: 0; height: 44px; padding: 0; width: 44px; }
+  .checklist-topbar .touch-button {
+    flex: 0 0 44px;
+    font-size: 0;
+    gap: 0;
+    height: 44px;
+    padding: 0;
+    width: 44px;
+  }
   .checklist-library { padding: 22px 16px 40px; }
   .section-heading > div > p { display: none; }
   .checklist-card { gap: 10px; grid-template-columns: 42px minmax(0, 1fr) 18px; min-height: 82px; padding: 13px; }
