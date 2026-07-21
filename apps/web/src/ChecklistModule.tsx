@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, CheckCircle2, ChevronRight, ClipboardCheck, History, ListChecks, Pencil, Play, Plus, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Checklist, ChecklistRun, ChecklistSummary, CreateChecklistInput } from "@homeos/shared";
 import {
   completeChecklistRun,
@@ -111,14 +111,17 @@ export function ChecklistModule() {
 
   if (screen.kind === "detail" && selected) {
     return (
-      <ChecklistDetail
-        checklist={selected}
-        error={error}
-        onBack={back}
-        onEdit={() => setEditing(selected)}
-        onRun={() => void beginRun()}
-        onOpenRun={(id) => void openRun(id)}
-      />
+      <>
+        <ChecklistDetail
+          checklist={selected}
+          error={error}
+          onBack={back}
+          onEdit={() => setEditing(selected)}
+          onRun={() => void beginRun()}
+          onOpenRun={(id) => void openRun(id)}
+        />
+        {editing ? <ChecklistEditor checklist={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSave={saveChecklist} /> : null}
+      </>
     );
   }
 
@@ -239,27 +242,10 @@ function ChecklistEditor({ checklist, onClose, onSave }: {
 }) {
   const [title, setTitle] = useState(checklist?.title ?? "");
   const [description, setDescription] = useState(checklist?.description ?? "");
-  const [items, setItems] = useState(() => checklist?.items.map((item) => ({ id: item.id, label: item.label })) ?? [{ id: crypto.randomUUID(), label: "" }]);
-  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
-  const itemInputs = useRef(new Map<string, HTMLInputElement>());
+  const [itemsText, setItemsText] = useState(checklist?.items.map((item) => item.label).join("\n") ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const cleanItems = useMemo(() => items.map((item) => item.label.trim()).filter(Boolean), [items]);
-
-  useEffect(() => {
-    if (!pendingFocusId) return;
-    const input = itemInputs.current.get(pendingFocusId);
-    if (!input) return;
-    input.focus({ preventScroll: true });
-    input.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    setPendingFocusId(null);
-  }, [items, pendingFocusId]);
-
-  function addItem() {
-    const id = crypto.randomUUID();
-    setItems((current) => [...current, { id, label: "" }]);
-    setPendingFocusId(id);
-  }
+  const cleanItems = useMemo(() => itemsText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean), [itemsText]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -279,11 +265,7 @@ function ChecklistEditor({ checklist, onClose, onSave }: {
         <header><div><p className="eyebrow">{checklist ? "Edit template" : "New template"}</p><h2>{checklist ? checklist.title : "Create a checklist"}</h2></div><button type="button" className="icon-button" onClick={onClose}><X size={20} /></button></header>
         <label>Title<input autoFocus value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} placeholder="Weekend packing" /></label>
         <label>Description <span className="optional">Optional</span><textarea value={description} maxLength={1000} onChange={(event) => setDescription(event.target.value)} placeholder="A quick note about when to use this list" /></label>
-        <fieldset><legend>Items</legend><div className="editor-items">
-          {items.map((item, index) => (
-            <div className="editor-item" key={item.id}><span>{index + 1}</span><input ref={(node) => { if (node) itemInputs.current.set(item.id, node); else itemInputs.current.delete(item.id); }} value={item.label} maxLength={300} onChange={(event) => setItems((current) => current.map((value) => value.id === item.id ? { ...value, label: event.target.value } : value))} placeholder="Add an item" /><button type="button" aria-label="Remove item" onClick={() => setItems((current) => current.filter((value) => value.id !== item.id))}><X size={17} /></button></div>
-          ))}
-        </div><button className="add-item-button" type="button" onClick={addItem}><Plus size={17} />Add item</button></fieldset>
+        <label>Items <span className="optional">One item per line</span><textarea className="items-textarea" value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={'Passport\nPhone charger\nWalking shoes'} spellCheck /></label>
         {error ? <p className="inline-error">{error}</p> : null}
         <footer><button className="secondary-button touch-button" type="button" onClick={onClose}>Cancel</button><button className="primary-button touch-button" type="submit" disabled={saving || !title.trim() || cleanItems.length === 0}>{saving ? "Saving…" : "Save checklist"}</button></footer>
       </form>
