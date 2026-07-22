@@ -8,6 +8,7 @@ export interface HomeNavigationState {
   imageId?: string;
   emailId?: string;
   dialog?: "shopping-editor";
+  todoListId?: string;
 }
 
 export function currentNavigation(): HomeNavigationState {

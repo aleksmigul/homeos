@@ -55,7 +55,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
+  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
   function navigateTravelView(view: "plans" | "inbox") { if (view !== travelView) pushNavigation({ module: "travel", travelView: view, emailId: undefined }); setTravelView(view); }
 
   async function bootstrap() {

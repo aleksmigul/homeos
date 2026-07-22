@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import initSqlJs, { type Database, type SqlValue } from "sql.js";
 import { config } from "./config.js";
@@ -224,9 +225,18 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_shopping_archived
       ON shopping_lists(archived_at DESC);
 
+    CREATE TABLE IF NOT EXISTS todo_lists (
+      id TEXT PRIMARY KEY,
+      owner_email TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS todos (
       id TEXT PRIMARY KEY,
       owner_email TEXT NOT NULL,
+      list_id TEXT NOT NULL REFERENCES todo_lists(id) ON DELETE CASCADE,
       text_content TEXT NOT NULL,
       created_at TEXT NOT NULL,
       completed_at TEXT
@@ -239,7 +249,23 @@ function migrate() {
   `);
 
   migrateCaptureOwnership();
+  migrateTodoLists();
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE)");
+  getDb().run("CREATE INDEX IF NOT EXISTS idx_todo_lists_owner_updated ON todo_lists(owner_email, updated_at DESC)");
+  getDb().run("CREATE INDEX IF NOT EXISTS idx_todos_list_created ON todos(list_id, created_at DESC)");
+}
+
+function migrateTodoLists() {
+  const columns = all<{ name: string }>("PRAGMA table_info(todos)");
+  if (columns.some((column) => column.name === "list_id")) return;
+  const owners = all<{ owner_email: string }>("SELECT DISTINCT owner_email FROM todos");
+  getDb().run("ALTER TABLE todos ADD COLUMN list_id TEXT");
+  for (const { owner_email: owner } of owners) {
+    const id = crypto.randomUUID();
+    const timestamps = get<{ created_at: string; updated_at: string }>("SELECT MIN(created_at) AS created_at, MAX(COALESCE(completed_at, created_at)) AS updated_at FROM todos WHERE owner_email = $owner", { $owner: owner })!;
+    run("INSERT INTO todo_lists (id, owner_email, title, created_at, updated_at) VALUES ($id, $owner, 'Personal', $createdAt, $updatedAt)", { $id: id, $owner: owner, $createdAt: timestamps.created_at, $updatedAt: timestamps.updated_at });
+    run("UPDATE todos SET list_id = $id WHERE owner_email = $owner", { $id: id, $owner: owner });
+  }
 }
 
 function migrateCaptureOwnership() {
