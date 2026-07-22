@@ -11,20 +11,33 @@ import {
   updateChecklist,
   updateChecklistRunItem
 } from "./api";
+import { currentNavigation, pushNavigation, type ChecklistScreenState } from "./navigation";
 
-type Screen = { kind: "library" } | { kind: "detail"; id: string } | { kind: "run"; id: string };
+type Screen = ChecklistScreenState;
 
 export function ChecklistModule() {
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
   const [selected, setSelected] = useState<Checklist | null>(null);
   const [activeRun, setActiveRun] = useState<ChecklistRun | null>(null);
-  const [screen, setScreen] = useState<Screen>({ kind: "library" });
+  const [screen, setScreen] = useState<Screen>(() => currentNavigation().checklist ?? { kind: "library" });
   const [editing, setEditing] = useState<Checklist | "new" | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     void refreshLibrary();
+    const initial = currentNavigation().checklist;
+    if (initial?.kind === "detail") void loadChecklist(initial.id, false);
+    if (initial?.kind === "run") void loadRun(initial.id, false);
+    const onPopState = () => {
+      const next = currentNavigation().checklist ?? { kind: "library" as const };
+      if (next.kind === "detail") void loadChecklist(next.id, false);
+      else if (next.kind === "run") void loadRun(next.id, false);
+      else setScreen(next);
+      setEditing(null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   async function refreshLibrary() {
@@ -40,22 +53,32 @@ export function ChecklistModule() {
   }
 
   async function openChecklist(id: string) {
+    await loadChecklist(id, true);
+  }
+
+  async function loadChecklist(id: string, addHistory: boolean) {
     setError("");
     try {
       const { checklist } = await getChecklist(id);
       setSelected(checklist);
       setScreen({ kind: "detail", id });
+      if (addHistory) pushNavigation({ module: "checklists", checklist: { kind: "detail", id } });
     } catch (cause) {
       setError(message(cause));
     }
   }
 
   async function openRun(id: string) {
+    await loadRun(id, true);
+  }
+
+  async function loadRun(id: string, addHistory: boolean) {
     setError("");
     try {
       const { checklistRun } = await getChecklistRun(id);
       setActiveRun(checklistRun);
       setScreen({ kind: "run", id });
+      if (addHistory) pushNavigation({ module: "checklists", checklist: { kind: "run", id } });
     } catch (cause) {
       setError(message(cause));
     }
@@ -73,6 +96,7 @@ export function ChecklistModule() {
     const { checklistRun } = await startChecklistRun(selected.id);
     setActiveRun(checklistRun);
     setScreen({ kind: "run", id: checklistRun.id });
+    pushNavigation({ module: "checklists", checklist: { kind: "run", id: checklistRun.id } });
   }
 
   async function toggleRunItem(itemId: string, checked: boolean) {
@@ -101,8 +125,7 @@ export function ChecklistModule() {
 
   function back() {
     setError("");
-    if (screen.kind === "run" && selected) setScreen({ kind: "detail", id: selected.id });
-    else setScreen({ kind: "library" });
+    window.history.back();
   }
 
   if (screen.kind === "run" && activeRun) {

@@ -2,6 +2,7 @@ import { ArrowLeft, Inbox, Mail, Paperclip } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { TravelEmail } from "@homeos/shared";
 import { getTravelInbox } from "./api";
+import { currentNavigation, pushNavigation } from "./navigation";
 
 export function TravelInbox() {
   const [emails, setEmails] = useState<TravelEmail[]>([]);
@@ -22,7 +23,14 @@ export function TravelInbox() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (selected) return <EmailReader email={selected} onBack={() => setSelected(null)} />;
+  useEffect(() => {
+    const syncEmail = () => { const id = currentNavigation().emailId; setSelected(id ? emails.find((email) => email.id === id) ?? null : null); };
+    syncEmail();
+    window.addEventListener("popstate", syncEmail);
+    return () => window.removeEventListener("popstate", syncEmail);
+  }, [emails]);
+
+  if (selected) return <EmailReader email={selected} onBack={() => window.history.back()} />;
 
   return (
     <section className="travel-inbox">
@@ -37,7 +45,7 @@ export function TravelInbox() {
       {!loading && emails.length === 0 ? <div className="inbox-empty"><Inbox size={30} /><h2>Nothing received yet</h2><p>Messages sent to the address above will show up here.</p></div> : null}
       <div className="email-list">
         {emails.map((email) => (
-          <button type="button" className="email-row" key={email.id} onClick={() => setSelected(email)}>
+          <button type="button" className="email-row" key={email.id} onClick={() => { pushNavigation({ module: "travel", travelView: "inbox", emailId: email.id }); setSelected(email); }}>
             <span className="email-avatar">{senderInitial(email.sender)}</span>
             <span className="email-summary"><strong>{email.subject}</strong><small>{email.sender}</small><span>{preview(email)}</span></span>
             <span className="email-meta"><time>{formatInboxDate(email.receivedAt)}</time>{email.attachments.length ? <small><Paperclip size={12} />{email.attachments.length}</small> : null}</span>

@@ -1,7 +1,8 @@
-import { Bookmark, ExternalLink, Inbox, Loader2, Plus, Share2, X } from "lucide-react";
+import { ArrowLeft, Bookmark, ExternalLink, Inbox, Loader2, Plus, Share2, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import type { CaptureStream, CreateSavedItemInput, SavedItem } from "@homeos/shared";
+import type { CaptureStream, CreateSavedItemInput, SavedAttachment, SavedItem } from "@homeos/shared";
 import { createCaptureStream, createSavedItem, listCaptureStreams, listSavedItems } from "./api";
+import { currentNavigation, pushNavigation } from "./navigation";
 
 export interface SharedDraft { title: string; text: string; url: string; attachmentIds: string[]; error: string }
 
@@ -12,6 +13,7 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   const [loading, setLoading] = useState(true);
   const [newStreamName, setNewStreamName] = useState("");
   const [addingStream, setAddingStream] = useState(false);
+  const [openImage, setOpenImage] = useState<SavedAttachment | null>(null);
 
   async function refresh(streamId = activeStreamId) {
     setLoading(true);
@@ -24,6 +26,17 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   }
 
   useEffect(() => { void refresh(""); }, []);
+  useEffect(() => {
+    const syncImage = () => {
+      const id = currentNavigation().imageId;
+      setOpenImage(id ? items.flatMap((item) => item.attachments).find((attachment) => attachment.id === id) ?? null : null);
+    };
+    syncImage();
+    window.addEventListener("popstate", syncImage);
+    return () => window.removeEventListener("popstate", syncImage);
+  }, [items]);
+
+  function viewImage(attachment: SavedAttachment) { pushNavigation({ module: "saved", imageId: attachment.id }); setOpenImage(attachment); }
 
   async function addStream(event: FormEvent) {
     event.preventDefault();
@@ -41,12 +54,13 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
       {loading ? <div className="saved-empty"><Loader2 className="spin" /></div> : items.length ? <div className="saved-list">{items.map((item) => <article className="saved-card" key={item.id}>
         <div className="saved-card-head"><span><Share2 size={14} />{item.source === "share-target" ? "Shared" : "Saved"}</span><time>{new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time></div>
         {item.title ? <h2>{item.title}</h2> : null}{item.text ? <p>{item.text}</p> : null}
-        {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => <a href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></a>)}</div> : null}
+        {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => <button type="button" onClick={() => viewImage(attachment)} key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></button>)}</div> : null}
         {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{displayUrl(item.url)}<ExternalLink size={14} /></a> : null}
       </article>)}</div> : <div className="saved-empty"><Inbox size={30} /><h2>Nothing here yet</h2><p>Share a link or message to The Annexation, then save it to this stream.</p></div>}
     </div>
     {addingStream ? <div className="modal-backdrop"><form className="compact-dialog" onSubmit={addStream}><button className="dialog-close" type="button" onClick={() => setAddingStream(false)} aria-label="Close"><X size={19} /></button><p className="eyebrow">New stream</p><h2>What are you collecting?</h2><label>Name<input autoFocus value={newStreamName} onChange={(event) => setNewStreamName(event.target.value)} placeholder="Recipes" /></label><button className="primary-button" type="submit">Create stream</button></form></div> : null}
     {sharedDraft ? <ShareCapture draft={sharedDraft} streams={streams} onCancel={() => onSharedDraftDone(false)} onSave={async (input) => { await createSavedItem(input); setActiveStreamId(input.streamId); await refresh(input.streamId); onSharedDraftDone(true); }} /> : null}
+    {openImage ? <div className="image-viewer" role="dialog" aria-modal="true" aria-label={openImage.name}><header><button type="button" onClick={() => window.history.back()}><ArrowLeft size={21} />Back</button><span>{openImage.name}</span></header><div><img src={openImage.url} alt={openImage.name} /></div></div> : null}
   </section>;
 }
 

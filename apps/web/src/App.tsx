@@ -6,6 +6,7 @@ import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
 import { SavedModule, type SharedDraft } from "./SavedModule";
+import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -33,8 +34,8 @@ export function App() {
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(() => readSharedDraft());
-  const [activeModule, setActiveModule] = useState<"travel" | "checklists" | "saved">(() => readSharedDraft() ? "saved" : "checklists");
-  const [travelView, setTravelView] = useState<"plans" | "inbox">("plans");
+  const [activeModule, setActiveModule] = useState<AppModule>(() => readSharedDraft() ? "saved" : currentNavigation().module ?? "checklists");
+  const [travelView, setTravelView] = useState<"plans" | "inbox">(() => currentNavigation().travelView ?? "plans");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
@@ -46,8 +47,14 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 
   useEffect(() => {
     void bootstrap();
-    if (window.location.pathname === "/share") window.history.replaceState({}, "", "/");
+    replaceNavigation({ module: activeModule, travelView }, window.location.pathname === "/share" ? "/" : undefined);
+    const onPopState = () => { const navigation = currentNavigation(); setActiveModule(navigation.module ?? "checklists"); setTravelView(navigation.travelView ?? "plans"); setIsMobileMenuOpen(false); };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
+  function navigateTravelView(view: "plans" | "inbox") { if (view !== travelView) pushNavigation({ module: "travel", travelView: view, emailId: undefined }); setTravelView(view); }
 
   async function bootstrap() {
     setIsLoading(true);
@@ -143,9 +150,9 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         <div className="sidebar-content">
           <p className="mobile-menu-label">Modules</p>
           <nav className="module-nav" aria-label="Modules">
-            <button className={activeModule === "checklists" ? "active" : ""} onClick={() => { setActiveModule("checklists"); setIsMobileMenuOpen(false); }}><ListChecks size={17} /><span>Checklists</span></button>
-            <button className={activeModule === "travel" ? "active" : ""} onClick={() => { setActiveModule("travel"); setIsMobileMenuOpen(false); }}><Plane size={17} /><span>Travel</span></button>
-            <button className={activeModule === "saved" ? "active" : ""} onClick={() => { setActiveModule("saved"); setIsMobileMenuOpen(false); }}><Bookmark size={17} /><span>Saved</span></button>
+            <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
+            <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
+            <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
           </nav>
           {activeModule === "travel" ? <button className="new-button" type="button" onClick={() => { setIsCreateOpen(true); setIsMobileMenuOpen(false); }}>
             <Plus size={16} />
@@ -183,7 +190,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
             <p className="eyebrow">Travel</p>
             <h1>{travelView === "inbox" ? "Inbox" : selectedPlan?.title ?? "No trips yet"}</h1>
           </div>
-          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => setTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => setTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
+          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => navigateTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => navigateTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
         </header>
 
         {travelView === "plans" ? <nav className="mobile-plan-strip" aria-label="Travel plans">
