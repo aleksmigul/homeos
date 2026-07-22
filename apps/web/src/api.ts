@@ -3,12 +3,16 @@ import type {
   ChecklistRun,
   ChecklistRunItem,
   ChecklistSummary,
+  CaptureStream,
+  CreateCaptureStreamInput,
+  CreateSavedItemInput,
   CreateChecklistInput,
   CreateTravelPlanInput,
   TravelPlan,
   TravelPlanSummary,
   TravelEmail,
   TravelRow,
+  SavedItem,
   UpdateChecklistInput,
   UpdateTravelRowInput
 } from "@homeos/shared";
@@ -111,4 +115,21 @@ export async function updateChecklistRunItem(id: string, checked: boolean) {
 
 export async function completeChecklistRun(id: string) {
   return request<{ checklistRun: ChecklistRun }>(`/api/checklist-runs/${id}/complete`, { method: "POST" });
+}
+
+export async function listCaptureStreams() {
+  return request<{ streams: CaptureStream[] }>("/api/capture-streams");
+}
+
+export async function createCaptureStream(input: CreateCaptureStreamInput) {
+  return request<{ stream: CaptureStream }>("/api/capture-streams", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function listSavedItems(streamId?: string) {
+  const query = streamId ? `?streamId=${encodeURIComponent(streamId)}` : "";
+  return request<{ items: SavedItem[] }>(`/api/saved-items${query}`);
+}
+
+export async function createSavedItem(input: CreateSavedItemInput) {
+  return request<{ item: SavedItem }>("/api/saved-items", { method: "POST", body: JSON.stringify(input) });
 }

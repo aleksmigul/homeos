@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { authRouter, requireAuth } from "./auth.js";
 import { initializeDatabase } from "./db.js";
 import { checklistRouter } from "./routes/checklists.js";
+import { captureRouter } from "./routes/capture.js";
 import { travelInboxRouter } from "./routes/travelInbox.js";
 import { travelRouter } from "./routes/travel.js";
 import { receiveResendWebhook } from "./resendWebhook.js";
@@ -20,7 +21,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", authRouter);
-app.use("/api", requireAuth, checklistRouter, travelInboxRouter, travelRouter);
+app.use("/api", requireAuth, captureRouter, checklistRouter, travelInboxRouter, travelRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {

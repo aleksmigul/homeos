@@ -1,10 +1,11 @@
-import { CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
+import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
+import { SavedModule, type SharedDraft } from "./SavedModule";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -31,7 +32,8 @@ export function App() {
 }
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
-  const [activeModule, setActiveModule] = useState<"travel" | "checklists">("checklists");
+  const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(() => readSharedDraft());
+  const [activeModule, setActiveModule] = useState<"travel" | "checklists" | "saved">(() => readSharedDraft() ? "saved" : "checklists");
   const [travelView, setTravelView] = useState<"plans" | "inbox">("plans");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
@@ -44,6 +46,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 
   useEffect(() => {
     void bootstrap();
+    if (window.location.pathname === "/share") window.history.replaceState({}, "", "/");
   }, []);
 
   async function bootstrap() {
@@ -142,6 +145,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => { setActiveModule("checklists"); setIsMobileMenuOpen(false); }}><ListChecks size={17} /><span>Checklists</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => { setActiveModule("travel"); setIsMobileMenuOpen(false); }}><Plane size={17} /><span>Travel</span></button>
+            <button className={activeModule === "saved" ? "active" : ""} onClick={() => { setActiveModule("saved"); setIsMobileMenuOpen(false); }}><Bookmark size={17} /><span>Saved</span></button>
           </nav>
           {activeModule === "travel" ? <button className="new-button" type="button" onClick={() => { setIsCreateOpen(true); setIsMobileMenuOpen(false); }}>
             <Plus size={16} />
@@ -173,7 +177,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : <section className="workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
         <header className="topbar">
           <div>
             <p className="eyebrow">Travel</p>
@@ -209,6 +213,13 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
       {isCreateOpen ? <CreateTravelDialog onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} /> : null}
     </main>
   );
+}
+
+function readSharedDraft(): SharedDraft | null {
+  if (window.location.pathname !== "/share") return null;
+  const params = new URLSearchParams(window.location.search);
+  const draft = { title: params.get("title")?.trim() ?? "", text: params.get("text")?.trim() ?? "", url: params.get("url")?.trim() ?? "" };
+  return draft.title || draft.text || draft.url ? draft : null;
 }
 
 function AuthLoading() {

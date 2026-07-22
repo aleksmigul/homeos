@@ -16,6 +16,10 @@ declare global {
   }
 }
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
+}
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

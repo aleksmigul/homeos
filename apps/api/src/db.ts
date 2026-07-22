@@ -156,5 +156,27 @@ function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_travel_emails_received
       ON travel_emails(received_at DESC);
+
+    CREATE TABLE IF NOT EXISTS capture_streams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS saved_items (
+      id TEXT PRIMARY KEY,
+      stream_id TEXT NOT NULL REFERENCES capture_streams(id) ON DELETE RESTRICT,
+      title TEXT NOT NULL DEFAULT '',
+      text_content TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT 'manual',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_saved_items_stream_created
+      ON saved_items(stream_id, created_at DESC);
+
+    INSERT OR IGNORE INTO capture_streams (id, name, created_at)
+      VALUES ('bookmarks', 'Bookmarks', datetime('now'));
   `);
 }
