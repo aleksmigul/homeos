@@ -133,3 +133,8 @@ export async function listSavedItems(streamId?: string) {
 export async function createSavedItem(input: CreateSavedItemInput) {
   return request<{ item: SavedItem }>("/api/saved-items", { method: "POST", body: JSON.stringify(input) });
 }
+
+export async function deleteSavedItem(id: string) {
+  const response = await fetch(`/api/saved-items/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(response.status === 404 ? "Saved item not found" : "Could not delete saved item");
+}

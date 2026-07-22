@@ -724,6 +724,9 @@ label {
 .saved-card { background: #fff; border: 1px solid #dbe3ed; border-radius: 13px; box-shadow: 0 5px 20px rgb(54 76 99 / 5%); padding: 18px; }
 .saved-card-head { align-items: center; color: #738196; display: flex; font-size: 11px; justify-content: space-between; }
 .saved-card-head span { align-items: center; display: inline-flex; gap: 5px; }
+.saved-card-head > div { align-items: center; display: flex; gap: 8px; }
+.saved-card-head button { align-items: center; background: transparent; border: 0; border-radius: 7px; color: #8190a3; display: inline-flex; justify-content: center; min-height: 34px; min-width: 34px; padding: 6px; }
+.saved-card-head button:hover { background: #f6e9e8; color: #a14436; }
 .saved-card h2 { color: #202936; font-size: 17px; margin: 12px 0 6px; }
 .saved-card p { color: #4e5e72; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; }
 .saved-card a { align-items: center; color: #35658f; display: inline-flex; font-size: 13px; gap: 5px; margin-top: 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

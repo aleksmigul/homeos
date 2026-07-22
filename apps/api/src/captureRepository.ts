@@ -73,6 +73,17 @@ export function createSavedItem(ownerEmail: string, input: CreateSavedItemInput)
   return { ...item, attachments: attachmentIds.map((id) => mapAttachment(get<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE id = $id", { $id: id })!)) };
 }
 
+export function deleteSavedItem(ownerEmail: string, id: string) {
+  const item = get<{ id: string }>("SELECT i.id FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE i.id = $id AND s.owner_email = $owner", { $id: id, $owner: ownerEmail });
+  if (!item) return false;
+  const attachments = all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE item_id = $id AND owner_email = $owner", { $id: id, $owner: ownerEmail });
+  writeTransaction(() => run("DELETE FROM saved_items WHERE id = $id", { $id: id }));
+  for (const attachment of attachments) {
+    try { fs.unlinkSync(path.join(config.uploadsPath, attachment.stored_name)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.error("Could not remove saved attachment", attachment.stored_name, error); }
+  }
+  return true;
+}
+
 const imageExtensions: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif", "image/heic": ".heic", "image/heif": ".heif" };
 export function savePendingAttachment(ownerEmail: string, originalName: string, mimeType: string, bytes: Buffer) {
   const extension = imageExtensions[mimeType];

@@ -1,7 +1,7 @@
-import { ArrowLeft, Bookmark, ExternalLink, Inbox, Loader2, Plus, Share2, X } from "lucide-react";
+import { ArrowLeft, Bookmark, ExternalLink, Inbox, Loader2, Plus, Share2, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import type { CaptureStream, CreateSavedItemInput, SavedAttachment, SavedItem } from "@homeos/shared";
-import { createCaptureStream, createSavedItem, listCaptureStreams, listSavedItems } from "./api";
+import { createCaptureStream, createSavedItem, deleteSavedItem, listCaptureStreams, listSavedItems } from "./api";
 import { currentNavigation, pushNavigation } from "./navigation";
 
 export interface SharedDraft { title: string; text: string; url: string; attachmentIds: string[]; error: string }
@@ -37,6 +37,11 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   }, [items]);
 
   function viewImage(attachment: SavedAttachment) { pushNavigation({ module: "saved", imageId: attachment.id }); setOpenImage(attachment); }
+  async function removeItem(item: SavedItem) {
+    if (!window.confirm(`Delete ${item.title ? `“${item.title}”` : "this saved item"}?`)) return;
+    await deleteSavedItem(item.id);
+    await refresh(activeStreamId);
+  }
 
   async function addStream(event: FormEvent) {
     event.preventDefault();
@@ -52,7 +57,7 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
     </nav>
     <div className="saved-content">
       {loading ? <div className="saved-empty"><Loader2 className="spin" /></div> : items.length ? <div className="saved-list">{items.map((item) => <article className="saved-card" key={item.id}>
-        <div className="saved-card-head"><span><Share2 size={14} />{item.source === "share-target" ? "Shared" : "Saved"}</span><time>{new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time></div>
+        <div className="saved-card-head"><span><Share2 size={14} />{item.source === "share-target" ? "Shared" : "Saved"}</span><div><time>{new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time><button type="button" onClick={() => void removeItem(item)} aria-label="Delete saved item"><Trash2 size={15} /></button></div></div>
         {item.title ? <h2>{item.title}</h2> : null}{item.text ? <p>{item.text}</p> : null}
         {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => <button type="button" onClick={() => viewImage(attachment)} key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></button>)}</div> : null}
         {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{displayUrl(item.url)}<ExternalLink size={14} /></a> : null}

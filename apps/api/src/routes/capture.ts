@@ -2,7 +2,7 @@ import fs from "node:fs";
 import express, { Router } from "express";
 import { z } from "zod";
 import { getAuthenticatedUser } from "../auth.js";
-import { createCaptureStream, createSavedItem, getAttachment, listCaptureStreams, listSavedItems, savePendingAttachment } from "../captureRepository.js";
+import { createCaptureStream, createSavedItem, deleteSavedItem, getAttachment, listCaptureStreams, listSavedItems, savePendingAttachment } from "../captureRepository.js";
 
 export const captureRouter = Router();
 const userEmail = (req: express.Request) => getAuthenticatedUser(req)!.email;
@@ -23,6 +23,11 @@ captureRouter.post("/saved-items", (req, res, next) => {
     if (!item) return res.status(404).json({ error: "Stream or attachment not found" });
     res.status(201).json({ item });
   } catch (error) { next(error); }
+});
+
+captureRouter.delete("/saved-items/:id", (req, res) => {
+  if (!deleteSavedItem(userEmail(req), req.params.id)) return res.status(404).json({ error: "Saved item not found" });
+  res.status(204).end();
 });
 
 captureRouter.post("/share-attachments", express.raw({ type: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"], limit: "12mb" }), (req, res) => {
