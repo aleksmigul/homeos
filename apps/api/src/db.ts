@@ -223,6 +223,19 @@ function migrate() {
       ON shopping_items(list_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_shopping_archived
       ON shopping_lists(archived_at DESC);
+
+    CREATE TABLE IF NOT EXISTS todos (
+      id TEXT PRIMARY KEY,
+      owner_email TEXT NOT NULL,
+      text_content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_todos_owner_created
+      ON todos(owner_email, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_todos_owner_completed
+      ON todos(owner_email, completed_at DESC);
   `);
 
   migrateCaptureOwnership();

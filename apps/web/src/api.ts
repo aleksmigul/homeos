@@ -17,6 +17,7 @@ import type {
   ShoppingItem,
   ShoppingList,
   ShoppingListSummary,
+  Todo,
   UpdateChecklistInput,
   UpdateTravelRowInput
 } from "@homeos/shared";
@@ -152,3 +153,7 @@ export async function releaseShoppingLock(token: string) { await fetch("/api/sho
 export async function updateCurrentShoppingList(token: string, title: string, items: string[]) { return request<{ shoppingList: ShoppingList }>("/api/shopping/current", { method: "PUT", headers: { "X-Shopping-Lock": token }, body: JSON.stringify({ title, items }) }); }
 export async function importShoppingItems(token: string, sourceListId: string, mode: "all" | "unchecked") { return request<{ shoppingList: ShoppingList; addedCount: number }>("/api/shopping/current/import", { method: "POST", headers: { "X-Shopping-Lock": token }, body: JSON.stringify({ sourceListId, mode }) }); }
 export async function archiveCurrentShoppingList(token: string) { return request<{ shoppingList: ShoppingList }>("/api/shopping/current/archive", { method: "POST", headers: { "X-Shopping-Lock": token } }); }
+
+export async function listTodos() { return request<{ todos: Todo[] }>("/api/todos"); }
+export async function createTodo(text: string) { return request<{ todo: Todo }>("/api/todos", { method: "POST", body: JSON.stringify({ text }) }); }
+export async function updateTodo(id: string, completed: boolean) { return request<{ todo: Todo }>(`/api/todos/${id}`, { method: "PATCH", body: JSON.stringify({ completed }) }); }

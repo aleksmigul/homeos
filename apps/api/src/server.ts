@@ -9,6 +9,7 @@ import { captureRouter } from "./routes/capture.js";
 import { travelInboxRouter } from "./routes/travelInbox.js";
 import { travelRouter } from "./routes/travel.js";
 import { shoppingRouter } from "./routes/shopping.js";
+import { todoRouter } from "./routes/todos.js";
 import { receiveResendWebhook } from "./resendWebhook.js";
 
 const app = express();
@@ -22,7 +23,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", authRouter);
-app.use("/api", requireAuth, captureRouter, checklistRouter, shoppingRouter, travelInboxRouter, travelRouter);
+app.use("/api", requireAuth, captureRouter, checklistRouter, shoppingRouter, todoRouter, travelInboxRouter, travelRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {

@@ -1,4 +1,4 @@
-import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, X } from "lucide-react";
+import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
@@ -8,6 +8,7 @@ import { TravelInbox } from "./TravelInbox";
 import { SavedModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 import { ShoppingModule } from "./ShoppingModule";
+import { TodoModule } from "./TodoModule";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -152,6 +153,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <p className="mobile-menu-label">Modules</p>
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
+            <button className={activeModule === "todos" ? "active" : ""} onClick={() => navigateModule("todos")}><ListTodo size={17} /><span>To-dos</span></button>
             <button className={activeModule === "shopping" ? "active" : ""} onClick={() => navigateModule("shopping")}><ShoppingCart size={17} /><span>Shopping</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
@@ -186,7 +188,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
         <header className="topbar">
           <div>
             <p className="eyebrow">Travel</p>
