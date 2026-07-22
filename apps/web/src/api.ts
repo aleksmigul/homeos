@@ -27,6 +27,8 @@ import type {
 export type AuthUser = { email: string; name: string; picture?: string };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (method !== "GET" && !navigator.onLine) throw new Error("Offline mode is read-only. Reconnect before making changes.");
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -59,6 +61,7 @@ export async function signInWithGoogle(credential: string) {
 }
 
 export async function logout() {
+  if (!navigator.onLine) throw new Error("Reconnect before signing out.");
   const response = await fetch("/api/auth/logout", { method: "POST" });
   if (!response.ok) throw new Error("Sign out failed");
 }
@@ -142,6 +145,7 @@ export async function createSavedItem(input: CreateSavedItemInput) {
 }
 
 export async function deleteSavedItem(id: string) {
+  if (!navigator.onLine) throw new Error("Offline mode is read-only. Reconnect before deleting items.");
   const response = await fetch(`/api/saved-items/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(response.status === 404 ? "Saved item not found" : "Could not delete saved item");
 }
@@ -162,3 +166,33 @@ export async function getTodoList(id: string) { return request<{ todoList: TodoL
 export async function renameTodoList(id: string, title: string) { return request<{ todoList: TodoList }>(`/api/todo-lists/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); }
 export async function createTodo(listId: string, text: string) { return request<{ todo: Todo }>(`/api/todo-lists/${listId}/todos`, { method: "POST", body: JSON.stringify({ text }) }); }
 export async function updateTodo(id: string, completed: boolean) { return request<{ todo: Todo }>(`/api/todos/${id}`, { method: "PATCH", body: JSON.stringify({ completed }) }); }
+
+export async function warmOfflineCache() {
+  if (!navigator.onLine) return;
+  const get = async <T>(path: string) => {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not download ${path}`);
+    return response.json() as Promise<T>;
+  };
+  const [{ travelPlans }, { checklists }, inbox, { streams }, shopping, { todoLists }] = await Promise.all([
+    get<{ travelPlans: TravelPlanSummary[] }>("/api/travel-plans"),
+    get<{ checklists: ChecklistSummary[] }>("/api/checklists"),
+    get<{ address: string; configured: boolean; emails: TravelEmail[] }>("/api/travel-inbox"),
+    get<{ streams: CaptureStream[] }>("/api/capture-streams"),
+    get<{ current: ShoppingList; archived: ShoppingListSummary[] }>("/api/shopping-lists"),
+    get<{ todoLists: TodoListSummary[] }>("/api/todo-lists")
+  ]);
+  void inbox;
+  const [travelDetails, checklistDetails, savedGroups] = await Promise.all([
+    Promise.all(travelPlans.map((plan) => get<{ travelPlan: TravelPlan }>(`/api/travel-plans/${plan.id}`))),
+    Promise.all(checklists.map((checklist) => get<{ checklist: Checklist }>(`/api/checklists/${checklist.id}`))),
+    Promise.all(streams.map((stream) => get<{ items: SavedItem[] }>(`/api/saved-items?streamId=${encodeURIComponent(stream.id)}`)))
+  ]);
+  void travelDetails;
+  await Promise.all([
+    ...checklistDetails.flatMap(({ checklist }) => checklist.runs.map((run) => get(`/api/checklist-runs/${run.id}`))),
+    ...shopping.archived.map((list) => get(`/api/shopping-lists/${list.id}`)),
+    ...todoLists.map((list) => get(`/api/todo-lists/${list.id}`)),
+    ...savedGroups.flatMap(({ items }) => items.flatMap((item) => item.attachments.map((attachment) => fetch(attachment.url).then((response) => { if (!response.ok) throw new Error(`Could not download ${attachment.name}`); }))))
+  ]);
+}

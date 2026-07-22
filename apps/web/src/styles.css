@@ -82,6 +82,29 @@ button {
   min-height: 100vh;
 }
 
+.connection-banner {
+  align-items: center;
+  border: 1px solid;
+  border-radius: 11px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  box-shadow: 0 10px 34px rgb(31 43 57 / 20%);
+  display: flex;
+  font-size: 12px;
+  gap: 9px;
+  left: 50%;
+  max-width: min(520px, calc(100vw - 28px));
+  padding: 10px 13px;
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 90;
+}
+.connection-banner span { line-height: 1.35; }
+.connection-banner strong { margin-right: 4px; }
+.connection-banner.offline { background: #26384a; border-color: #40576e; color: #fff; }
+.connection-banner.storage { background: #fff7e3; border-color: #dfc981; color: #665421; }
+.connection-banner.storage > svg:last-child { margin-left: auto; }
+
 .sidebar {
   background: #eaf0f7;
   border-right: 1px solid #d6dfe9;

@@ -1,7 +1,7 @@
-import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, X } from "lucide-react";
+import { AlertTriangle, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
-import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
+import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
@@ -9,6 +9,7 @@ import { SavedModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 import { ShoppingModule } from "./ShoppingModule";
 import { TodoModule } from "./TodoModule";
+import { clearOfflineAccount, configureOfflineAccount, storagePressure } from "./offline";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -31,7 +32,7 @@ export function App() {
   if (authLoading) return <AuthLoading />;
   if (!user) return <LoginPage clientId={clientId} error={authError} onError={setAuthError} onSignIn={setUser} />;
 
-  return <Planner user={user} onLogout={() => logout().then(() => setUser(null))} />;
+  return <Planner user={user} onLogout={() => logout().then(clearOfflineAccount).then(() => setUser(null))} />;
 }
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
@@ -45,6 +46,8 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState("Ready");
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [storageWarning, setStorageWarning] = useState("");
   const selectedRow = selectedPlan?.rows.find((row) => row.id === selectedRowId) ?? selectedPlan?.rows[0] ?? null;
 
   useEffect(() => {
@@ -54,6 +57,26 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    const sync = async () => {
+      setIsOffline(false);
+      try {
+        await configureOfflineAccount(user.email);
+        await warmOfflineCache();
+      } catch (cause) {
+        console.warn("Offline snapshot could not be fully updated", cause);
+      }
+      const storage = await storagePressure().catch(() => null);
+      setStorageWarning(storage && storage.ratio >= 0.8 ? `Offline storage is ${Math.round(storage.ratio * 100)}% full.` : "");
+    };
+    const offline = () => setIsOffline(true);
+    const online = () => void sync();
+    window.addEventListener("offline", offline); window.addEventListener("online", online);
+    navigator.serviceWorker?.addEventListener("controllerchange", online);
+    if (navigator.onLine) void sync();
+    return () => { window.removeEventListener("offline", offline); window.removeEventListener("online", online); navigator.serviceWorker?.removeEventListener("controllerchange", online); };
+  }, [user.email]);
 
   function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
   function navigateTravelView(view: "plans" | "inbox") { if (view !== travelView) pushNavigation({ module: "travel", travelView: view, emailId: undefined }); setTravelView(view); }
@@ -222,6 +245,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
       </section>}
 
       {isCreateOpen ? <CreateTravelDialog onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} /> : null}
+      {isOffline ? <div className="connection-banner offline"><WifiOff size={16} /><span><strong>Offline</strong> Showing the downloaded copy. Changes are disabled.</span></div> : storageWarning ? <div className="connection-banner storage"><AlertTriangle size={16} /><span><strong>Storage warning</strong> {storageWarning}</span><HardDrive size={15} /></div> : null}
     </main>
   );
 }
