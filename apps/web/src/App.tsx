@@ -156,9 +156,9 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
           </nav>
-          {activeModule === "travel" ? <button className="new-button" type="button" onClick={() => { setIsCreateOpen(true); setIsMobileMenuOpen(false); }}>
+          {activeModule === "travel" ? <button className="new-button add-action" type="button" onClick={() => { setIsCreateOpen(true); setIsMobileMenuOpen(false); }}>
             <Plus size={16} />
-            New travel
+            <span>New travel</span>
           </button> : null}
           {activeModule === "travel" ? <nav className="plan-list" aria-label="Travel plans">
             {plans.map((plan) => (
@@ -192,7 +192,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
             <p className="eyebrow">Travel</p>
             <h1>{travelView === "inbox" ? "Inbox" : selectedPlan?.title ?? "No trips yet"}</h1>
           </div>
-          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => navigateTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => navigateTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel" onClick={() => setIsCreateOpen(true)}><Plus size={16} />New</button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
+          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => navigateTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => navigateTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel add-action" onClick={() => setIsCreateOpen(true)}><Plus size={16} /><span>New</span></button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
         </header>
 
         {travelView === "plans" ? <nav className="mobile-plan-strip" aria-label="Travel plans">
@@ -404,9 +404,9 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     <section className="empty-state">
       <Plane size={28} />
       <h2>Start with a trip</h2>
-      <button className="primary-button" type="button" onClick={onCreate}>
+      <button className="primary-button add-action" type="button" onClick={onCreate}>
         <Plus size={16} />
-        New travel
+        <span>New travel</span>
       </button>
     </section>
   );

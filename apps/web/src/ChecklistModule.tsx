@@ -152,14 +152,14 @@ export function ChecklistModule() {
     <section className="workspace checklist-workspace">
       <header className="topbar checklist-topbar">
         <div><p className="eyebrow">Reusable routines</p><h1>Checklists</h1></div>
-        <button className="primary-button touch-button" type="button" onClick={() => setEditing("new")}><Plus size={18} />New checklist</button>
+        <button className="primary-button touch-button add-action" type="button" onClick={() => setEditing("new")}><Plus size={18} /><span>New checklist</span></button>
       </header>
       <div className="checklist-library">
         <div className="section-heading"><div><h2>Your checklists</h2><p>Pick one whenever it is time to get things done.</p></div></div>
         {error ? <p className="inline-error">{error}</p> : null}
         {loading ? <div className="skeleton-card" /> : null}
         {!loading && checklists.length === 0 ? (
-          <div className="checklist-empty"><ClipboardCheck size={32} /><h2>Make your first reusable list</h2><p>Packing, cleaning, closing up—anything you do more than once.</p><button className="primary-button touch-button" onClick={() => setEditing("new")}><Plus size={18} />Create checklist</button></div>
+          <div className="checklist-empty"><ClipboardCheck size={32} /><h2>Make your first reusable list</h2><p>Packing, cleaning, closing up—anything you do more than once.</p><button className="primary-button touch-button add-action" onClick={() => setEditing("new")}><Plus size={18} /><span>Create checklist</span></button></div>
         ) : (
           <div className="checklist-card-grid">
             {checklists.map((checklist) => (

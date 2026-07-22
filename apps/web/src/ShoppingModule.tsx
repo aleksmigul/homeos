@@ -64,7 +64,7 @@ export function ShoppingModule() {
   }
 
   return <section className="workspace shopping-workspace">
-    <header className="topbar shopping-topbar"><div><p className="eyebrow">Shared household list</p><h1>Shopping</h1></div><button className="primary-button touch-button" onClick={() => void beginEditing()}><Plus size={18} />Add or edit</button></header>
+    <header className="topbar shopping-topbar"><div><p className="eyebrow">Shared household list</p><h1>Shopping</h1></div><button className="primary-button touch-button add-action" onClick={() => void beginEditing()}><Plus size={18} /><span>Add or edit</span></button></header>
     <div className="shopping-layout">
       {error ? <p className={error.startsWith("Added") || error.startsWith("Nothing") ? "inline-notice" : "inline-error"}>{error}</p> : null}
       {loading || !current ? <div className="skeleton-card" /> : <article className="current-shopping-card">

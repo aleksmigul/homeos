@@ -196,6 +196,24 @@ button {
   justify-content: center;
 }
 
+.add-action {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.add-action svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.add-action > span {
+  line-height: 1;
+}
+
 .plan-list {
   display: flex;
   flex-direction: column;
@@ -1243,14 +1261,15 @@ label {
   }
 
   .checklist-topbar h1 { font-size: 27px; }
-  .checklist-topbar .touch-button {
+  .topbar .add-action {
     flex: 0 0 44px;
-    font-size: 0;
     gap: 0;
     height: 44px;
+    min-height: 44px;
     padding: 0;
     width: 44px;
   }
+  .topbar .add-action > span { display: none; }
   .checklist-library { padding: 22px 16px 40px; }
   .section-heading > div > p { display: none; }
   .checklist-card { gap: 10px; grid-template-columns: 42px minmax(0, 1fr) 18px; min-height: 82px; padding: 13px; }
@@ -1332,7 +1351,7 @@ label {
 @media (max-width: 760px) {
   .saved-workspace .topbar { align-items: center; flex-direction: row; }
   .saved-workspace .topbar h1 { font-size: 27px; }
-  .saved-workspace .topbar .secondary-button { font-size: 0; height: 44px; padding: 0; width: 44px; }
+  .saved-workspace .topbar .secondary-button { height: 44px; padding: 0; width: 44px; }
   .stream-tabs { padding: 10px 16px; }
   .saved-content { padding: 18px 14px 42px; }
   .saved-card { border-radius: 11px; padding: 15px; }
@@ -1362,7 +1381,7 @@ label {
 .shopping-editor .eyebrow { align-items: center; display: flex; gap: 5px; }.shopping-editor-actions { align-items: center; display: grid !important; grid-template-columns: auto 1fr auto auto; }.archive-list-button { align-items: center; background: transparent; border: 0; color: #a14436; display: inline-flex; gap: 6px; min-height: 44px; padding: 8px; }
 
 @media (max-width: 760px) {
-  .shopping-topbar { align-items: center; flex-direction: row; }.shopping-topbar h1 { font-size: 27px; }.shopping-topbar .touch-button { flex: 0 0 44px; font-size: 0; height: 44px; padding: 0; width: 44px; }
+  .shopping-topbar { align-items: center; flex-direction: row; }.shopping-topbar h1 { font-size: 27px; }
   .shopping-layout { gap: 24px; padding: 18px 14px 44px; }.current-shopping-card > header { padding: 18px 16px 14px; }.current-shopping-card > header .secondary-button { font-size: 0; height: 42px; padding: 0; width: 42px; }
   .shopping-items { padding: 6px 10px 12px; }.shopping-item { min-height: 58px; }.shopping-history-card footer { display: grid; grid-template-columns: 1fr 1fr; }.shopping-history-card footer button { justify-content: center; }
   .shopping-editor-actions { grid-template-columns: 1fr 1fr !important; }.shopping-editor-actions > span { display: none; }.shopping-editor-actions .archive-list-button { grid-column: 1 / -1; justify-content: center; order: 3; }

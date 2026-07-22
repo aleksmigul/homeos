@@ -51,7 +51,7 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   }
 
   return <section className="workspace saved-workspace">
-    <header className="topbar"><div><p className="eyebrow">Your library</p><h1>Saved</h1></div><button className="secondary-button" onClick={() => setAddingStream(true)}><Plus size={16} />New stream</button></header>
+    <header className="topbar"><div><p className="eyebrow">Your library</p><h1>Saved</h1></div><button className="secondary-button add-action" onClick={() => setAddingStream(true)}><Plus size={16} /><span>New stream</span></button></header>
     <nav className="stream-tabs" aria-label="Saved streams">
       {streams.map((stream) => <button key={stream.id} className={stream.id === activeStreamId ? "active" : ""} onClick={() => { setActiveStreamId(stream.id); setLoading(true); void listSavedItems(stream.id).then(({ items: next }) => setItems(next)).finally(() => setLoading(false)); }}><Bookmark size={15} />{stream.name}<span>{stream.itemCount}</span></button>)}
     </nav>
