@@ -189,6 +189,40 @@ function migrate() {
       ON saved_items(stream_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_saved_attachments_item
       ON saved_attachments(item_id);
+
+    CREATE TABLE IF NOT EXISTS shopping_lists (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Shopping list',
+      status TEXT NOT NULL CHECK(status IN ('current', 'archived')),
+      created_at TEXT NOT NULL,
+      archived_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS shopping_items (
+      id TEXT PRIMARY KEY,
+      list_id TEXT NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      is_checked INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL,
+      added_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      checked_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS shopping_edit_locks (
+      list_id TEXT PRIMARY KEY REFERENCES shopping_lists(id) ON DELETE CASCADE,
+      owner_email TEXT NOT NULL,
+      owner_name TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_one_current
+      ON shopping_lists(status) WHERE status = 'current';
+    CREATE INDEX IF NOT EXISTS idx_shopping_items_order
+      ON shopping_items(list_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_shopping_archived
+      ON shopping_lists(archived_at DESC);
   `);
 
   migrateCaptureOwnership();

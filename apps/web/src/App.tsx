@@ -1,4 +1,4 @@
-import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, X } from "lucide-react";
+import { Bookmark, CalendarPlus, ChevronRight, Inbox, ListChecks, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, type AuthUser } from "./api";
@@ -7,6 +7,7 @@ import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
 import { SavedModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
+import { ShoppingModule } from "./ShoppingModule";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -53,7 +54,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
+  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
   function navigateTravelView(view: "plans" | "inbox") { if (view !== travelView) pushNavigation({ module: "travel", travelView: view, emailId: undefined }); setTravelView(view); }
 
   async function bootstrap() {
@@ -151,6 +152,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <p className="mobile-menu-label">Modules</p>
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
+            <button className={activeModule === "shopping" ? "active" : ""} onClick={() => navigateModule("shopping")}><ShoppingCart size={17} /><span>Shopping</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
           </nav>
@@ -184,7 +186,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
         <header className="topbar">
           <div>
             <p className="eyebrow">Travel</p>

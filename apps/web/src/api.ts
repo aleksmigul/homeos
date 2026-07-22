@@ -13,6 +13,10 @@ import type {
   TravelEmail,
   TravelRow,
   SavedItem,
+  ShoppingEditLock,
+  ShoppingItem,
+  ShoppingList,
+  ShoppingListSummary,
   UpdateChecklistInput,
   UpdateTravelRowInput
 } from "@homeos/shared";
@@ -138,3 +142,13 @@ export async function deleteSavedItem(id: string) {
   const response = await fetch(`/api/saved-items/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!response.ok) throw new Error(response.status === 404 ? "Saved item not found" : "Could not delete saved item");
 }
+
+export async function getShoppingOverview() { return request<{ current: ShoppingList; archived: ShoppingListSummary[] }>("/api/shopping-lists"); }
+export async function getShoppingList(id: string) { return request<{ shoppingList: ShoppingList }>(`/api/shopping-lists/${id}`); }
+export async function updateShoppingItem(id: string, checked: boolean) { return request<{ item: ShoppingItem }>(`/api/shopping-items/${id}`, { method: "PATCH", body: JSON.stringify({ checked }) }); }
+export async function acquireShoppingLock() { return request<{ lock: ShoppingEditLock }>("/api/shopping/current/lock", { method: "POST" }); }
+export async function renewShoppingLock(token: string) { return request<{ expiresAt: string }>("/api/shopping/current/lock/renew", { method: "POST", headers: { "X-Shopping-Lock": token } }); }
+export async function releaseShoppingLock(token: string) { await fetch("/api/shopping/current/lock", { method: "DELETE", headers: { "X-Shopping-Lock": token } }); }
+export async function updateCurrentShoppingList(token: string, title: string, items: string[]) { return request<{ shoppingList: ShoppingList }>("/api/shopping/current", { method: "PUT", headers: { "X-Shopping-Lock": token }, body: JSON.stringify({ title, items }) }); }
+export async function importShoppingItems(token: string, sourceListId: string, mode: "all" | "unchecked") { return request<{ shoppingList: ShoppingList; addedCount: number }>("/api/shopping/current/import", { method: "POST", headers: { "X-Shopping-Lock": token }, body: JSON.stringify({ sourceListId, mode }) }); }
+export async function archiveCurrentShoppingList(token: string) { return request<{ shoppingList: ShoppingList }>("/api/shopping/current/archive", { method: "POST", headers: { "X-Shopping-Lock": token } }); }
