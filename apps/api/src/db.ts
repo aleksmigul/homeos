@@ -159,7 +159,8 @@ function migrate() {
 
     CREATE TABLE IF NOT EXISTS capture_streams (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      owner_email TEXT NOT NULL,
+      name TEXT NOT NULL COLLATE NOCASE,
       created_at TEXT NOT NULL
     );
 
@@ -173,10 +174,50 @@ function migrate() {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS saved_attachments (
+      id TEXT PRIMARY KEY,
+      owner_email TEXT NOT NULL,
+      item_id TEXT REFERENCES saved_items(id) ON DELETE CASCADE,
+      original_name TEXT NOT NULL,
+      stored_name TEXT NOT NULL UNIQUE,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_saved_items_stream_created
       ON saved_items(stream_id, created_at DESC);
-
-    INSERT OR IGNORE INTO capture_streams (id, name, created_at)
-      VALUES ('bookmarks', 'Bookmarks', datetime('now'));
+    CREATE INDEX IF NOT EXISTS idx_saved_attachments_item
+      ON saved_attachments(item_id);
   `);
+
+  migrateCaptureOwnership();
+  getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE)");
+}
+
+function migrateCaptureOwnership() {
+  const columns = all<{ name: string }>("PRAGMA table_info(capture_streams)");
+  if (columns.some((column) => column.name === "owner_email")) return;
+  const owner = config.allowedEmails[0] ?? "legacy@homeos.local";
+  const database = getDb();
+  database.run("PRAGMA foreign_keys = OFF");
+  database.run(`
+    DROP TABLE IF EXISTS saved_attachments;
+    ALTER TABLE saved_items RENAME TO saved_items_legacy;
+    ALTER TABLE capture_streams RENAME TO capture_streams_legacy;
+    DROP INDEX IF EXISTS idx_saved_items_stream_created;
+    CREATE TABLE capture_streams (id TEXT PRIMARY KEY, owner_email TEXT NOT NULL, name TEXT NOT NULL COLLATE NOCASE, created_at TEXT NOT NULL);
+    CREATE TABLE saved_items (id TEXT PRIMARY KEY, stream_id TEXT NOT NULL REFERENCES capture_streams(id) ON DELETE RESTRICT, title TEXT NOT NULL DEFAULT '', text_content TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'manual', created_at TEXT NOT NULL);
+  `);
+  run("INSERT INTO capture_streams SELECT id, $owner, name, created_at FROM capture_streams_legacy", { $owner: owner });
+  database.run(`
+    INSERT INTO saved_items SELECT * FROM saved_items_legacy;
+    DROP TABLE saved_items_legacy;
+    DROP TABLE capture_streams_legacy;
+    CREATE UNIQUE INDEX idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE);
+    CREATE INDEX idx_saved_items_stream_created ON saved_items(stream_id, created_at DESC);
+    CREATE TABLE saved_attachments (id TEXT PRIMARY KEY, owner_email TEXT NOT NULL, item_id TEXT REFERENCES saved_items(id) ON DELETE CASCADE, original_name TEXT NOT NULL, stored_name TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
+    CREATE INDEX idx_saved_attachments_item ON saved_attachments(item_id);
+  `);
+  database.run("PRAGMA foreign_keys = ON");
 }

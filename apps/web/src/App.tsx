@@ -218,8 +218,8 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 function readSharedDraft(): SharedDraft | null {
   if (window.location.pathname !== "/share") return null;
   const params = new URLSearchParams(window.location.search);
-  const draft = { title: params.get("title")?.trim() ?? "", text: params.get("text")?.trim() ?? "", url: params.get("url")?.trim() ?? "" };
-  return draft.title || draft.text || draft.url ? draft : null;
+  const draft = { title: params.get("title")?.trim() ?? "", text: params.get("text")?.trim() ?? "", url: params.get("url")?.trim() ?? "", attachmentIds: params.getAll("attachment"), error: params.get("shareError") ?? "" };
+  return draft.title || draft.text || draft.url || draft.attachmentIds.length || draft.error ? draft : null;
 }
 
 function AuthLoading() {

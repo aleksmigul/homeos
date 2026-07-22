@@ -727,6 +727,11 @@ label {
 .saved-card h2 { color: #202936; font-size: 17px; margin: 12px 0 6px; }
 .saved-card p { color: #4e5e72; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; }
 .saved-card a { align-items: center; color: #35658f; display: inline-flex; font-size: 13px; gap: 5px; margin-top: 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-images, .share-images { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 12px; }
+.saved-images a { border-radius: 10px; display: block; margin: 0; overflow: hidden; }
+.saved-images img, .share-images img { aspect-ratio: 4 / 3; background: #e8eef5; display: block; height: 100%; object-fit: cover; width: 100%; }
+.share-images { max-height: 260px; overflow-y: auto; }
+.share-images img { border-radius: 10px; max-height: 220px; }
 .saved-empty { align-items: center; color: #718096; display: flex; flex-direction: column; justify-content: center; min-height: 330px; text-align: center; }
 .saved-empty h2 { color: #293545; margin: 14px 0 5px; }.saved-empty p { margin: 0; max-width: 390px; }
 .compact-dialog, .share-dialog { background: #fff; border: 1px solid #dbe3ed; border-radius: 16px; box-shadow: 0 24px 80px rgb(38 54 72 / 22%); display: grid; gap: 15px; padding: 24px; position: relative; width: min(100%, 480px); }

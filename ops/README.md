@@ -37,13 +37,15 @@ After changing a template, validate it and deliberately install it under `/etc`.
 
 ## Backups
 
-The backup timer creates a compressed daily copy under `/var/backups/homeos` and
-retains 14 days. It briefly stops the API so the `sql.js` database cannot be
-copied during a whole-file rewrite. These local backups protect against an app
+The backup timer creates compressed daily copies of the database and saved-item
+attachments under `/var/backups/homeos` and retains 14 days. It briefly stops
+the API so the `sql.js` database cannot be copied during a whole-file rewrite.
+These local backups protect against an app
 or operator mistake, but not VPS or disk loss. Sync this directory to encrypted
 off-server storage.
 
 To restore, stop HomeOS, decompress a selected backup to a temporary file, run
 an integrity check, install it as `/var/lib/homeos/homeos.db` owned by
-`homeos:homeos` with mode `0600`, then start HomeOS. Keep the current database
-until the restored application has been verified.
+`homeos:homeos` with mode `0600`, extract the matching attachments archive under
+`/var/lib/homeos`, restore ownership to `homeos:homeos`, then start HomeOS. Keep
+the current database and uploads until the restored application has been verified.

@@ -10,6 +10,7 @@ export const config = {
   host: process.env.API_HOST ?? "127.0.0.1",
   port: Number(process.env.API_PORT ?? 4000),
   databasePath: path.resolve(repoRoot, process.env.DATABASE_PATH ?? "data/homeos.db"),
+  uploadsPath: path.resolve(repoRoot, process.env.UPLOADS_PATH ?? "data/uploads"),
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   allowedEmails: (process.env.AUTH_ALLOWED_EMAILS ?? "")
     .split(",")

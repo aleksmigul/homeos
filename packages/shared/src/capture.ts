@@ -15,6 +15,15 @@ export interface SavedItem {
   url: string;
   source: string;
   createdAt: ISODateTime;
+  attachments: SavedAttachment[];
+}
+
+export interface SavedAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  url: string;
 }
 
 export interface CreateCaptureStreamInput { name: string }
@@ -24,4 +33,5 @@ export interface CreateSavedItemInput {
   text?: string;
   url?: string;
   source?: string;
+  attachmentIds?: string[];
 }

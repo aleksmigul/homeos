@@ -44,6 +44,11 @@ function readSession(req: Request): Session | null {
   }
 }
 
+export function getAuthenticatedUser(req: Request) {
+  const session = readSession(req);
+  return session ? { email: session.email, name: session.name, picture: session.picture } : null;
+}
+
 function sessionCookie(value: string, maxAge = sessionLifetimeSeconds) {
   return [
     `${cookieName}=${value}`,
