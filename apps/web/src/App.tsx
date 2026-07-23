@@ -1,4 +1,4 @@
-import { AlertTriangle, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
@@ -38,7 +38,7 @@ export function App() {
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(() => readSharedDraft());
   const [activeModule, setActiveModule] = useState<AppModule>(() => readSharedDraft() ? "saved" : currentNavigation().module ?? "checklists");
-  const [travelView, setTravelView] = useState<"plans" | "inbox">(() => currentNavigation().travelView ?? "plans");
+  const [travelScreen, setTravelScreen] = useState<"library" | "inbox" | "plan">(() => currentNavigation().travelScreen ?? "library");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
@@ -52,8 +52,15 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 
   useEffect(() => {
     void bootstrap();
-    replaceNavigation({ module: activeModule, travelView }, window.location.pathname === "/share" ? "/" : undefined);
-    const onPopState = () => { const navigation = currentNavigation(); setActiveModule(navigation.module ?? "checklists"); setTravelView(navigation.travelView ?? "plans"); setIsMobileMenuOpen(false); };
+    replaceNavigation({ module: activeModule, travelScreen }, window.location.pathname === "/share" ? "/" : undefined);
+    const onPopState = () => {
+      const navigation = currentNavigation();
+      setActiveModule(navigation.module ?? "checklists");
+      setTravelScreen(navigation.travelScreen ?? "library");
+      setIsMobileMenuOpen(false);
+      if (navigation.travelScreen === "plan" && navigation.travelPlanId) void loadPlan(navigation.travelPlanId);
+      else setSelectedPlan(null);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -78,17 +85,34 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     return () => { window.removeEventListener("offline", offline); window.removeEventListener("online", online); navigator.serviceWorker?.removeEventListener("controllerchange", online); };
   }, [user.email]);
 
-  function navigateModule(module: AppModule) { if (module !== activeModule) pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined }); setActiveModule(module); setIsMobileMenuOpen(false); }
-  function navigateTravelView(view: "plans" | "inbox") { if (view !== travelView) pushNavigation({ module: "travel", travelView: view, emailId: undefined }); setTravelView(view); }
+  function navigateModule(module: AppModule) {
+    if (module !== activeModule || (module === "travel" && travelScreen !== "library")) {
+      pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined, travelScreen: module === "travel" ? "library" : undefined, travelPlanId: undefined });
+    }
+    setActiveModule(module);
+    if (module === "travel") { setTravelScreen("library"); setSelectedPlan(null); }
+    setIsMobileMenuOpen(false);
+  }
+
+  function openTravelInbox() {
+    pushNavigation({ module: "travel", travelScreen: "inbox", travelPlanId: undefined, emailId: undefined });
+    setTravelScreen("inbox");
+    setSelectedPlan(null);
+  }
+
+  async function openTravelPlan(id: string) {
+    await loadPlan(id);
+    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: id, emailId: undefined });
+    setTravelScreen("plan");
+  }
 
   async function bootstrap() {
     setIsLoading(true);
     try {
       const { travelPlans } = await listTravelPlans();
       setPlans(travelPlans);
-      if (travelPlans[0]) {
-        await loadPlan(travelPlans[0].id);
-      }
+      const navigation = currentNavigation();
+      if (navigation.travelScreen === "plan" && navigation.travelPlanId) await loadPlan(navigation.travelPlanId);
     } finally {
       setIsLoading(false);
     }
@@ -158,6 +182,8 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     ]);
     setSelectedPlan(travelPlan);
     setSelectedRowId(travelPlan.rows[0]?.id ?? null);
+    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: travelPlan.id, emailId: undefined });
+    setTravelScreen("plan");
     setIsCreateOpen(false);
     setStatus("Created");
   }
@@ -181,28 +207,6 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
           </nav>
-          {activeModule === "travel" ? <button className="new-button add-action" type="button" onClick={() => { setIsCreateOpen(true); setIsMobileMenuOpen(false); }}>
-            <Plus size={16} />
-            <span>New travel</span>
-          </button> : null}
-          {activeModule === "travel" ? <nav className="plan-list" aria-label="Travel plans">
-            {plans.map((plan) => (
-              <button
-                className={plan.id === selectedPlan?.id ? "plan-link active" : "plan-link"}
-                key={plan.id}
-                type="button"
-                onClick={() => { void loadPlan(plan.id); setIsMobileMenuOpen(false); }}
-              >
-                <Plane size={15} />
-                <span>
-                  <strong>{plan.title}</strong>
-                  <small>
-                    {formatDate(plan.startDate)} - {formatDate(plan.endDate)}
-                  </small>
-                </span>
-              </button>
-            ))}
-          </nav> : null}
         </div>
         <div className="account-card">
           {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : null}
@@ -211,24 +215,43 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Travel</p>
-            <h1>{travelView === "inbox" ? "Inbox" : selectedPlan?.title ?? "No trips yet"}</h1>
-          </div>
-          <div className="topbar-actions"><div className="travel-view-toggle"><button className={travelView === "plans" ? "active" : ""} onClick={() => navigateTravelView("plans")}><Plane size={15} />Plans</button><button className={travelView === "inbox" ? "active" : ""} onClick={() => navigateTravelView("inbox")}><Inbox size={15} />Inbox</button></div>{travelView === "plans" ? <><button className="primary-button mobile-create-travel add-action" onClick={() => setIsCreateOpen(true)}><Plus size={16} /><span>New</span></button><div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div></> : null}</div>
-        </header>
-
-        {travelView === "plans" ? <nav className="mobile-plan-strip" aria-label="Travel plans">
-          {plans.map((plan) => (
-            <button className={plan.id === selectedPlan?.id ? "active" : ""} key={plan.id} type="button" onClick={() => void loadPlan(plan.id)}>
-              {plan.title}
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace travel-workspace">
+        {travelScreen === "library" ? <>
+          <header className="topbar checklist-topbar">
+            <div><p className="eyebrow">Trips & reservations</p><h1>Travel</h1></div>
+            <button className="primary-button add-action" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /><span>New trip</span></button>
+          </header>
+          <div className="travel-library">
+            <button className="travel-inbox-card" type="button" onClick={openTravelInbox}>
+              <span className="travel-card-icon"><Inbox size={20} /></span>
+              <span><strong>Travel inbox</strong><small>Forward reservations and travel emails here</small></span>
+              <ChevronRight size={18} />
             </button>
-          ))}
-        </nav> : null}
-
-        {travelView === "inbox" ? <TravelInbox /> : selectedPlan ? (
+            <div className="section-heading">
+              <div><h2>Your trips</h2><p>Open a trip to view and edit its itinerary.</p></div>
+              <span>{plans.length} {plans.length === 1 ? "trip" : "trips"}</span>
+            </div>
+            {isLoading ? <div className="travel-loading"><Loader2 className="spin" size={22} />Loading trips</div> : plans.length ? <div className="travel-card-grid">
+              {plans.map((plan) => <button className="travel-card" type="button" key={plan.id} onClick={() => void openTravelPlan(plan.id)}>
+                <span className="travel-card-icon"><Plane size={20} /></span>
+                <span className="travel-card-copy"><strong>{plan.title}</strong><small>{formatDate(plan.startDate)} – {formatDate(plan.endDate)}</small></span>
+                <span className="travel-card-meta">{plan.rowCount} {plan.rowCount === 1 ? "day" : "days"}</span>
+                <ChevronRight size={18} />
+              </button>)}
+            </div> : <EmptyState onCreate={() => setIsCreateOpen(true)} />}
+          </div>
+        </> : travelScreen === "inbox" ? <>
+          <header className="topbar detail-topbar travel-detail-topbar">
+            <button className="icon-button" type="button" aria-label="Back to travel" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
+            <div className="detail-title"><p className="eyebrow">Travel</p><h1>Inbox</h1></div>
+          </header>
+          <TravelInbox />
+        </> : selectedPlan ? <>
+          <header className="topbar detail-topbar travel-detail-topbar">
+            <button className="icon-button" type="button" aria-label="Back to travel" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
+            <div className="detail-title"><p>{formatDate(selectedPlan.startDate)} – {formatDate(selectedPlan.endDate)}</p><h1>{selectedPlan.title}</h1></div>
+            <div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div>
+          </header>
           <div className="planner-grid">
             <TravelTable
               rows={selectedPlan.rows}
@@ -239,9 +262,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
             />
             <RowPage row={selectedRow} onChange={patchLocalRow} onSave={saveRow} />
           </div>
-        ) : (
-          <EmptyState onCreate={() => setIsCreateOpen(true)} />
-        )}
+        </> : null}
       </section>}
 
       {isCreateOpen ? <CreateTravelDialog onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} /> : null}

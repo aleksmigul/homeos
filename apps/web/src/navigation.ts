@@ -3,7 +3,8 @@ export type ChecklistScreenState = { kind: "library" } | { kind: "detail"; id: s
 
 export interface HomeNavigationState {
   module?: AppModule;
-  travelView?: "plans" | "inbox";
+  travelScreen?: "library" | "inbox" | "plan";
+  travelPlanId?: string;
   checklist?: ChecklistScreenState;
   imageId?: string;
   emailId?: string;

@@ -45,7 +45,7 @@ export function TravelInbox() {
       {!loading && emails.length === 0 ? <div className="inbox-empty"><Inbox size={30} /><h2>Nothing received yet</h2><p>Messages sent to the address above will show up here.</p></div> : null}
       <div className="email-list">
         {emails.map((email) => (
-          <button type="button" className="email-row" key={email.id} onClick={() => { pushNavigation({ module: "travel", travelView: "inbox", emailId: email.id }); setSelected(email); }}>
+          <button type="button" className="email-row" key={email.id} onClick={() => { pushNavigation({ module: "travel", travelScreen: "inbox", travelPlanId: undefined, emailId: email.id }); setSelected(email); }}>
             <span className="email-avatar">{senderInitial(email.sender)}</span>
             <span className="email-summary"><strong>{email.subject}</strong><small>{email.sender}</small><span>{preview(email)}</span></span>
             <span className="email-meta"><time>{formatInboxDate(email.receivedAt)}</time>{email.attachments.length ? <small><Paperclip size={12} />{email.attachments.length}</small> : null}</span>
