@@ -209,7 +209,7 @@ function ChecklistDetail({ checklist, error, onBack, onEdit, onRun, onOpenRun }:
             {checklist.runs.map((run) => (
               <button type="button" className="history-row" key={run.id} onClick={() => onOpenRun(run.id)}>
                 <span className={run.completedAt ? "history-status complete" : "history-status"}>{run.completedAt ? <Check size={14} /> : <Play size={13} />}</span>
-                <span><strong>{run.completedAt ? "Completed" : "In progress"}</strong><small>{formatDateTime(run.startedAt)}</small></span>
+                <span><strong>{run.completedAt ? "Completed" : "In progress"}</strong><small>{formatDateTime(run.completedAt ?? run.startedAt)}</small></span>
                 <span className="history-count">{run.checkedCount}/{run.itemCount}</span>
                 <ChevronRight size={16} />
               </button>
@@ -242,9 +242,19 @@ function RunScreen({ run, error, onBack, onToggle, onComplete }: {
         <p className="run-date">Started {formatDateTime(run.startedAt)}</p>
         <div className="run-items">
           {run.items.map((item) => (
-            <button className={item.checked ? "run-item checked" : "run-item"} type="button" key={item.id} disabled={complete} onClick={() => onToggle(item.id, !item.checked)}>
-              <span className="run-checkbox">{item.checked ? <Check size={21} strokeWidth={3} /> : null}</span><span>{item.label}</span>
-            </button>
+            <div className={item.checked ? "run-item checked" : "run-item"} key={item.id}>
+              <button
+                className="run-checkbox"
+                type="button"
+                aria-label={`${item.checked ? "Uncheck" : "Check"} ${item.label}`}
+                aria-pressed={item.checked}
+                disabled={complete}
+                onClick={() => onToggle(item.id, !item.checked)}
+              >
+                {item.checked ? <Check size={21} strokeWidth={3} /> : null}
+              </button>
+              <span>{item.label}</span>
+            </div>
           ))}
         </div>
         {error ? <p className="inline-error">{error}</p> : null}

@@ -80,7 +80,7 @@ export function getChecklist(id: string): Checklist | null {
     { ":id": id }
   ).map(mapChecklistItem);
   const runs = all<RunRecord>(
-    `${runSummarySql} WHERE r.checklist_id = :id GROUP BY r.id ORDER BY r.started_at DESC`,
+    `${runSummarySql} WHERE r.checklist_id = :id GROUP BY r.id ORDER BY r.completed_at DESC, r.started_at DESC`,
     { ":id": id }
   ).map(mapRunSummary);
 

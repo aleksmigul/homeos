@@ -1114,9 +1114,11 @@ label {
   width: 100%;
 }
 
-.run-item.checked { background: #edf3f9; border-color: #c3d3e3; color: #5f7084; text-decoration: line-through; }
-.run-item:disabled { cursor: default; }
-.run-checkbox { align-items: center; border: 2px solid #9eabba; border-radius: 7px; display: flex; flex: 0 0 auto; height: 27px; justify-content: center; width: 27px; }
+.run-item.checked { background: #edf3f9; border-color: #c3d3e3; color: #5f7084; }
+.run-item.checked > span:last-child { text-decoration: line-through; }
+.run-checkbox { align-items: center; background: #ffffff; border: 2px solid #9eabba; border-radius: 7px; color: inherit; cursor: pointer; display: flex; flex: 0 0 auto; height: 31px; justify-content: center; padding: 0; width: 31px; }
+.run-checkbox:focus-visible { outline: 3px solid rgb(53 101 143 / 22%); outline-offset: 2px; }
+.run-checkbox:disabled { cursor: default; }
 .run-item.checked .run-checkbox { background: #35658f; border-color: #35658f; color: white; }
 
 .completion-card {
