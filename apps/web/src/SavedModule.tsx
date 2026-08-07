@@ -1,4 +1,4 @@
-import { ArrowLeft, Bookmark, ExternalLink, Inbox, Loader2, Plus, Share2, Trash2, X } from "lucide-react";
+import { ArrowLeft, Bookmark, BookmarkPlus, ExternalLink, FolderPlus, Inbox, Loader2, Share2, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import type { CaptureStream, CreateSavedItemInput, SavedAttachment, SavedItem } from "@homeos/shared";
 import { createCaptureStream, createSavedItem, deleteSavedItem, listCaptureStreams, listSavedItems } from "./api";
@@ -13,6 +13,7 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   const [loading, setLoading] = useState(true);
   const [newStreamName, setNewStreamName] = useState("");
   const [addingStream, setAddingStream] = useState(false);
+  const [addingBookmark, setAddingBookmark] = useState(false);
   const [openImage, setOpenImage] = useState<SavedAttachment | null>(null);
 
   async function refresh(streamId = activeStreamId) {
@@ -51,7 +52,7 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
   }
 
   return <section className="workspace saved-workspace">
-    <header className="topbar"><div><p className="eyebrow">Your library</p><h1>Saved</h1></div><button className="secondary-button add-action" onClick={() => setAddingStream(true)}><Plus size={16} /><span>New stream</span></button></header>
+    <header className="topbar"><div><p className="eyebrow">Your library</p><h1>Saved</h1></div><div className="topbar-actions"><button className="secondary-button add-action saved-stream-action" onClick={() => setAddingStream(true)} aria-label="New stream"><FolderPlus size={16} /><span>New stream</span></button><button className="primary-button add-action" onClick={() => setAddingBookmark(true)} aria-label="Add bookmark"><BookmarkPlus size={17} /><span>Add bookmark</span></button></div></header>
     <nav className="stream-tabs" aria-label="Saved streams">
       {streams.map((stream) => <button key={stream.id} className={stream.id === activeStreamId ? "active" : ""} onClick={() => { setActiveStreamId(stream.id); setLoading(true); void listSavedItems(stream.id).then(({ items: next }) => setItems(next)).finally(() => setLoading(false)); }}><Bookmark size={15} />{stream.name}<span>{stream.itemCount}</span></button>)}
     </nav>
@@ -61,12 +62,41 @@ export function SavedModule({ sharedDraft, onSharedDraftDone }: { sharedDraft: S
         {item.title ? <h2>{item.title}</h2> : null}{item.text ? <p>{item.text}</p> : null}
         {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => <button type="button" onClick={() => viewImage(attachment)} key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></button>)}</div> : null}
         {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{displayUrl(item.url)}<ExternalLink size={14} /></a> : null}
-      </article>)}</div> : <div className="saved-empty"><Inbox size={30} /><h2>Nothing here yet</h2><p>Share a link or message to The Annexation, then save it to this stream.</p></div>}
+      </article>)}</div> : <div className="saved-empty"><Inbox size={30} /><h2>Nothing here yet</h2><p>Add a bookmark here, or share a link or message to The Annexation.</p><button className="primary-button add-action" type="button" onClick={() => setAddingBookmark(true)}><BookmarkPlus size={17} /><span>Add bookmark</span></button></div>}
     </div>
     {addingStream ? <div className="modal-backdrop"><form className="compact-dialog" onSubmit={addStream}><button className="dialog-close" type="button" onClick={() => setAddingStream(false)} aria-label="Close"><X size={19} /></button><p className="eyebrow">New stream</p><h2>What are you collecting?</h2><label>Name<input autoFocus value={newStreamName} onChange={(event) => setNewStreamName(event.target.value)} placeholder="Recipes" /></label><button className="primary-button" type="submit">Create stream</button></form></div> : null}
+    {addingBookmark ? <ManualBookmarkDialog streams={streams} initialStreamId={activeStreamId} onCancel={() => setAddingBookmark(false)} onSave={async (input) => { await createSavedItem(input); setAddingBookmark(false); setActiveStreamId(input.streamId); await refresh(input.streamId); }} /> : null}
     {sharedDraft ? <ShareCapture draft={sharedDraft} streams={streams} onCancel={() => onSharedDraftDone(false)} onSave={async (input) => { await createSavedItem(input); setActiveStreamId(input.streamId); await refresh(input.streamId); onSharedDraftDone(true); }} /> : null}
     {openImage ? <div className="image-viewer" role="dialog" aria-modal="true" aria-label={openImage.name}><header><button type="button" onClick={() => window.history.back()}><ArrowLeft size={21} />Back</button><span>{openImage.name}</span></header><div><img src={openImage.url} alt={openImage.name} /></div></div> : null}
   </section>;
+}
+
+function ManualBookmarkDialog({ streams, initialStreamId, onCancel, onSave }: { streams: CaptureStream[]; initialStreamId: string; onCancel: () => void; onSave: (input: CreateSavedItemInput) => Promise<void> }) {
+  const [streamId, setStreamId] = useState(initialStreamId || streams[0]?.id || "");
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [url, setUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const normalizedUrl = normalizeUrl(url);
+    if (!streamId || !(title.trim() || text.trim() || normalizedUrl)) return;
+    setSaving(true); setError("");
+    try { await onSave({ streamId, title, text, url: normalizedUrl, source: "manual" }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not add bookmark"); setSaving(false); }
+  }
+
+  return <div className="modal-backdrop share-backdrop"><form className="share-dialog" onSubmit={submit}>
+    <div className="share-dialog-head"><div><p className="eyebrow">Saved</p><h2>Add a bookmark</h2></div><button type="button" onClick={onCancel} aria-label="Cancel"><X size={20} /></button></div>
+    <label>Save to<select value={streamId} onChange={(event) => setStreamId(event.target.value)}>{streams.map((stream) => <option key={stream.id} value={stream.id}>{stream.name}</option>)}</select></label>
+    <label><span>Title <small className="optional">Optional</small></span><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Something worth keeping" /></label>
+    <label><span>Link <small className="optional">Optional</small></span><input inputMode="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com/article" /></label>
+    <label><span>Notes <small className="optional">Optional</small></span><textarea rows={5} value={text} onChange={(event) => setText(event.target.value)} placeholder="Why are you saving this?" /></label>
+    {error ? <p className="form-error">{error}</p> : null}
+    <button className="primary-button share-save" disabled={saving || !streamId || !(title.trim() || text.trim() || url.trim())}>{saving ? <Loader2 className="spin" size={17} /> : <BookmarkPlus size={17} />}Add bookmark</button>
+  </form></div>;
 }
 
 function ShareCapture({ draft, streams, onCancel, onSave }: { draft: SharedDraft; streams: CaptureStream[]; onCancel: () => void; onSave: (input: CreateSavedItemInput) => Promise<void> }) {
@@ -90,3 +120,4 @@ function ShareCapture({ draft, streams, onCancel, onSave }: { draft: SharedDraft
 }
 
 function displayUrl(value: string) { try { const url = new URL(value); return `${url.hostname}${url.pathname === "/" ? "" : url.pathname}`; } catch { return value; } }
+function normalizeUrl(value: string) { const trimmed = value.trim(); return trimmed && !/^https?:\/\//i.test(trimmed) ? `https://${trimmed}` : trimmed; }
