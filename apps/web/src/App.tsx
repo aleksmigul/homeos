@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
@@ -12,6 +12,7 @@ import { TodoModule } from "./TodoModule";
 import { clearOfflineAccount, configureOfflineAccount, storagePressure } from "./offline";
 
 const today = new Date().toISOString().slice(0, 10);
+const modules: AppModule[] = ["checklists", "todos", "shopping", "travel", "saved"];
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -48,6 +49,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [status, setStatus] = useState("Ready");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
+  const titleSwipe = useRef<{ x: number; y: number } | null>(null);
   const selectedRow = selectedPlan?.rows.find((row) => row.id === selectedRowId) ?? selectedPlan?.rows[0] ?? null;
 
   useEffect(() => {
@@ -92,6 +94,31 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     setActiveModule(module);
     if (module === "travel") { setTravelScreen("library"); setSelectedPlan(null); }
     setIsMobileMenuOpen(false);
+  }
+
+  function startTitleSwipe(event: ReactTouchEvent<HTMLElement>) {
+    const target = event.target instanceof Element ? event.target : null;
+    const isTitleBar = target?.closest(".topbar, .run-header");
+    if (!isTitleBar || target?.closest("button, a, input, textarea, select, label") || !window.matchMedia("(max-width: 760px)").matches) {
+      titleSwipe.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    titleSwipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+
+  function finishTitleSwipe(event: ReactTouchEvent<HTMLElement>) {
+    const start = titleSwipe.current;
+    titleSwipe.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 55 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    const currentIndex = modules.indexOf(activeModule);
+    const nextIndex = currentIndex + (deltaX < 0 ? 1 : -1);
+    const nextModule = modules[nextIndex];
+    if (nextModule) navigateModule(nextModule);
   }
 
   function openTravelInbox() {
@@ -189,7 +216,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   }
 
   return (
-    <main className="shell">
+    <main className="shell" onTouchStart={startTitleSwipe} onTouchEnd={finishTitleSwipe} onTouchCancel={() => { titleSwipe.current = null; }}>
       <aside className={isMobileMenuOpen ? "sidebar mobile-menu-open" : "sidebar"}>
         <div className="brand">
           <img className="app-mark" src="/favicon.png" alt="" />

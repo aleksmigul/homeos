@@ -1361,6 +1361,9 @@ label {
 }
 
 @media (max-width: 760px) {
+  .topbar,
+  .run-header { touch-action: pan-y; }
+
   .saved-workspace .topbar { align-items: center; flex-direction: row; }
   .saved-workspace .topbar h1 { font-size: 27px; }
   .saved-workspace .topbar .secondary-button { height: 44px; padding: 0; width: 44px; }
