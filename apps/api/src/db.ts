@@ -229,6 +229,7 @@ function migrate() {
       id TEXT PRIMARY KEY,
       owner_email TEXT NOT NULL,
       title TEXT NOT NULL,
+      is_shared INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -250,9 +251,16 @@ function migrate() {
 
   migrateCaptureOwnership();
   migrateTodoLists();
+  migrateTodoSharing();
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE)");
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todo_lists_owner_updated ON todo_lists(owner_email, updated_at DESC)");
+  getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_lists_one_shared ON todo_lists(is_shared) WHERE is_shared = 1");
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todos_list_created ON todos(list_id, created_at DESC)");
+}
+
+function migrateTodoSharing() {
+  const columns = all<{ name: string }>("PRAGMA table_info(todo_lists)");
+  if (!columns.some((column) => column.name === "is_shared")) getDb().run("ALTER TABLE todo_lists ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0");
 }
 
 function migrateTodoLists() {

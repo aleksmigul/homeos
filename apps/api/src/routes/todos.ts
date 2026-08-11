@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getAuthenticatedUser } from "../auth.js";
-import { createTodo, createTodoList, getTodoList, listTodoLists, renameTodoList, setTodoCompleted } from "../todoRepository.js";
+import { createTodo, createTodoList, getSharedTodoList, getTodoList, listTodoLists, renameTodoList, setTodoCompleted } from "../todoRepository.js";
 
 export const todoRouter = Router();
 const owner = (req: Parameters<typeof getAuthenticatedUser>[0]) => getAuthenticatedUser(req)!.email;
 const titleSchema = z.object({ title: z.string().trim().min(1).max(120) });
 
-todoRouter.get("/todo-lists", (req, res) => res.json({ todoLists: listTodoLists(owner(req)) }));
+todoRouter.get("/todo-lists", (req, res) => res.json({ todoLists: listTodoLists(owner(req)), sharedTodoList: getSharedTodoList() }));
 todoRouter.post("/todo-lists", (req, res, next) => { try { res.status(201).json({ todoList: createTodoList(owner(req), titleSchema.parse(req.body).title) }); } catch (error) { next(error); } });
 todoRouter.get("/todo-lists/:id", (req, res) => { const todoList = getTodoList(owner(req), req.params.id); if (!todoList) return res.status(404).json({ error: "To-do list not found" }); res.json({ todoList }); });
 todoRouter.patch("/todo-lists/:id", (req, res, next) => { try { const todoList = renameTodoList(owner(req), req.params.id, titleSchema.parse(req.body).title); if (!todoList) return res.status(404).json({ error: "To-do list not found" }); res.json({ todoList }); } catch (error) { next(error); } });

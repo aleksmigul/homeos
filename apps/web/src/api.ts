@@ -160,7 +160,7 @@ export async function updateCurrentShoppingList(token: string, title: string, it
 export async function importShoppingItems(token: string, sourceListId: string, mode: "all" | "unchecked") { return request<{ shoppingList: ShoppingList; addedCount: number }>("/api/shopping/current/import", { method: "POST", headers: { "X-Shopping-Lock": token }, body: JSON.stringify({ sourceListId, mode }) }); }
 export async function archiveCurrentShoppingList(token: string) { return request<{ shoppingList: ShoppingList }>("/api/shopping/current/archive", { method: "POST", headers: { "X-Shopping-Lock": token } }); }
 
-export async function listTodoLists() { return request<{ todoLists: TodoListSummary[] }>("/api/todo-lists"); }
+export async function listTodoLists() { return request<{ todoLists: TodoListSummary[]; sharedTodoList: TodoListSummary }>("/api/todo-lists"); }
 export async function createTodoList(title: string) { return request<{ todoList: TodoListSummary }>("/api/todo-lists", { method: "POST", body: JSON.stringify({ title }) }); }
 export async function getTodoList(id: string) { return request<{ todoList: TodoList }>(`/api/todo-lists/${id}`); }
 export async function renameTodoList(id: string, title: string) { return request<{ todoList: TodoList }>(`/api/todo-lists/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); }
@@ -174,13 +174,13 @@ export async function warmOfflineCache() {
     if (!response.ok) throw new Error(`Could not download ${path}`);
     return response.json() as Promise<T>;
   };
-  const [{ travelPlans }, { checklists }, inbox, { streams }, shopping, { todoLists }] = await Promise.all([
+  const [{ travelPlans }, { checklists }, inbox, { streams }, shopping, { todoLists, sharedTodoList }] = await Promise.all([
     get<{ travelPlans: TravelPlanSummary[] }>("/api/travel-plans"),
     get<{ checklists: ChecklistSummary[] }>("/api/checklists"),
     get<{ address: string; configured: boolean; emails: TravelEmail[] }>("/api/travel-inbox"),
     get<{ streams: CaptureStream[] }>("/api/capture-streams"),
     get<{ current: ShoppingList; archived: ShoppingListSummary[] }>("/api/shopping-lists"),
-    get<{ todoLists: TodoListSummary[] }>("/api/todo-lists")
+    get<{ todoLists: TodoListSummary[]; sharedTodoList: TodoListSummary }>("/api/todo-lists")
   ]);
   void inbox;
   const [travelDetails, checklistDetails, savedGroups] = await Promise.all([
@@ -192,6 +192,7 @@ export async function warmOfflineCache() {
   await Promise.all([
     ...checklistDetails.flatMap(({ checklist }) => checklist.runs.map((run) => get(`/api/checklist-runs/${run.id}`))),
     ...shopping.archived.map((list) => get(`/api/shopping-lists/${list.id}`)),
+    get(`/api/todo-lists/${sharedTodoList.id}`),
     ...todoLists.map((list) => get(`/api/todo-lists/${list.id}`)),
     ...savedGroups.flatMap(({ items }) => items.flatMap((item) => item.attachments.map((attachment) => fetch(attachment.url).then((response) => { if (!response.ok) throw new Error(`Could not download ${attachment.name}`); }))))
   ]);

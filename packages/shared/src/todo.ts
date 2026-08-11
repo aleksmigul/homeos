@@ -11,6 +11,7 @@ export interface Todo {
 export interface TodoListSummary {
   id: string;
   title: string;
+  shared: boolean;
   openCount: number;
   completedCount: number;
   createdAt: ISODateTime;

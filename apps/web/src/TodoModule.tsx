@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, Pencil, Plus, Users, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Todo, TodoList, TodoListSummary } from "@homeos/shared";
 import { createTodo, createTodoList, getTodoList, listTodoLists, renameTodoList, updateTodo } from "./api";
@@ -6,6 +6,7 @@ import { currentNavigation, pushNavigation } from "./navigation";
 
 export function TodoModule() {
   const [lists, setLists] = useState<TodoListSummary[]>([]);
+  const [sharedList, setSharedList] = useState<TodoListSummary | null>(null);
   const [selected, setSelected] = useState<TodoList | null>(null);
   const [newListTitle, setNewListTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,16 +19,18 @@ export function TodoModule() {
     window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  async function refreshLists() { setLoading(true); try { setLists((await listTodoLists()).todoLists); } catch (cause) { setError(message(cause)); } finally { setLoading(false); } }
+  async function refreshLists() { setLoading(true); try { const response = await listTodoLists(); setLists(response.todoLists); setSharedList(response.sharedTodoList); } catch (cause) { setError(message(cause)); } finally { setLoading(false); } }
   async function loadList(id: string, addHistory: boolean) { setLoading(true); try { const { todoList } = await getTodoList(id); setSelected(todoList); if (addHistory) pushNavigation({ module: "todos", todoListId: id }); } catch (cause) { setError(message(cause)); } finally { setLoading(false); } }
 
   async function makeList(event: FormEvent) { event.preventDefault(); const title = newListTitle?.trim(); if (!title) return; try { const { todoList } = await createTodoList(title); setNewListTitle(null); await loadList(todoList.id, true); } catch (cause) { setError(message(cause)); } }
   if (selected) return <TodoListDetail list={selected} loading={loading} error={error} onBack={() => window.history.back()} onChange={setSelected} />;
 
   return <section className="workspace todo-workspace">
-    <header className="topbar todo-topbar"><div><p className="eyebrow">Just for you</p><h1>To-dos</h1></div><button className="primary-button touch-button add-action" onClick={() => setNewListTitle("")}><Plus size={18} /><span>New list</span></button></header>
+    <header className="topbar todo-topbar"><div><p className="eyebrow">Personal & household</p><h1>To-dos</h1></div><button className="primary-button touch-button add-action" onClick={() => setNewListTitle("")}><Plus size={18} /><span>New list</span></button></header>
     <div className="todo-library">
       {error ? <p className="inline-error">{error}</p> : null}{loading ? <div className="skeleton-card" /> : null}
+      {!loading && sharedList ? <button className="todo-list-card shared-todo-card" onClick={() => void loadList(sharedList.id, true)}><span className="todo-list-icon"><Users size={20} /></span><span><strong>{sharedList.title}</strong><small>{sharedList.openCount} open · {sharedList.completedCount} completed</small><time>Shared with the household</time></span><ChevronRight size={18} /></button> : null}
+      {!loading ? <div className="todo-library-heading"><div><p className="eyebrow">Private</p><h2>Your lists</h2></div><span>{lists.length}</span></div> : null}
       {!loading && !lists.length ? <div className="todo-empty"><CheckCircle2 size={31} /><h2>No lists yet</h2><p>Create a list for work, home, someday, or anything else.</p></div> : null}
       <div className="todo-list-grid">{lists.map((list) => <button className="todo-list-card" key={list.id} onClick={() => void loadList(list.id, true)}><span className="todo-list-icon"><ListTodo size={20} /></span><span><strong>{list.title}</strong><small>{list.openCount} open · {list.completedCount} completed</small><time>Active {formatRelative(list.updatedAt)}</time></span><ChevronRight size={18} /></button>)}</div>
     </div>
@@ -41,7 +44,7 @@ function TodoListDetail({ list, loading, error, onBack, onChange }: { list: Todo
   async function add(event: FormEvent) { event.preventDefault(); const clean = text.trim(); if (!clean) return; setAdding(true); try { const { todo } = await createTodo(list.id, clean); onChange({ ...list, todos: [todo, ...list.todos], openCount: list.openCount + 1, updatedAt: todo.createdAt }); setText(""); } catch (cause) { setLocalError(message(cause)); } finally { setAdding(false); } }
   async function toggle(todo: Todo) { const nextCompleted = !todo.completedAt; const optimistic = { ...todo, completedAt: nextCompleted ? new Date().toISOString() : null }; onChange(updateListTodo(list, optimistic)); try { const response = await updateTodo(todo.id, nextCompleted); onChange(updateListTodo(list, response.todo)); } catch (cause) { setLocalError(message(cause)); onChange(list); } }
   async function submitRename(event: FormEvent) { event.preventDefault(); if (!renameTitle?.trim()) return; try { onChange((await renameTodoList(list.id, renameTitle.trim())).todoList); setRenameTitle(null); } catch (cause) { setLocalError(message(cause)); } }
-  return <section className="workspace todo-workspace"><header className="topbar detail-topbar todo-detail-topbar"><button className="icon-button" onClick={onBack}><ArrowLeft size={20} /></button><div className="detail-title"><p className="eyebrow">Personal list</p><h1>{list.title}</h1></div><button className="secondary-button touch-button" onClick={() => setRenameTitle(list.title)}><Pencil size={16} />Rename</button></header><div className="todo-layout">
+  return <section className="workspace todo-workspace"><header className="topbar detail-topbar todo-detail-topbar"><button className="icon-button" onClick={onBack}><ArrowLeft size={20} /></button><div className="detail-title"><p className="eyebrow">{list.shared ? "Household list" : "Personal list"}</p><h1>{list.title}</h1></div>{list.shared ? <span className="todo-shared-badge"><Users size={15} />Shared</span> : <button className="secondary-button touch-button" onClick={() => setRenameTitle(list.title)}><Pencil size={16} />Rename</button>}</header><div className="todo-layout">
     <form className="todo-add" onSubmit={(event) => void add(event)}><label htmlFor="new-todo">Add a to-do</label><div><input id="new-todo" value={text} maxLength={500} onChange={(event) => setText(event.target.value)} placeholder="What needs doing?" autoComplete="off" /><button className="primary-button add-action" disabled={adding || !text.trim()}>{adding ? <Loader2 className="spin" size={18} /> : <Plus size={18} />}<span>Add</span></button></div></form>
     {error || localError ? <p className="inline-error">{localError || error}</p> : null}{loading ? <div className="skeleton-card" /> : null}
     {!loading && !list.todos.length ? <div className="todo-empty"><CheckCircle2 size={31} /><h2>Nothing waiting</h2><p>Add one thing at a time. Completed work will remain below with its timing.</p></div> : null}
