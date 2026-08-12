@@ -247,6 +247,18 @@ function migrate() {
       ON todos(owner_email, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_todos_owner_completed
       ON todos(owner_email, completed_at DESC);
+
+    CREATE TABLE IF NOT EXISTS shared_notes (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      updated_by TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_shared_notes_updated
+      ON shared_notes(updated_at DESC);
   `);
 
   migrateCaptureOwnership();

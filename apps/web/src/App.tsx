@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, StickyNote, WifiOff, X } from "lucide-react";
 import { FormEvent, TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
@@ -9,10 +9,11 @@ import { SavedModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 import { ShoppingModule } from "./ShoppingModule";
 import { TodoModule } from "./TodoModule";
+import { NotesModule } from "./NotesModule";
 import { clearOfflineAccount, configureOfflineAccount, storagePressure } from "./offline";
 
 const today = new Date().toISOString().slice(0, 10);
-const modules: AppModule[] = ["checklists", "todos", "shopping", "travel", "saved"];
+const modules: AppModule[] = ["checklists", "todos", "notes", "shopping", "travel", "saved"];
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -89,7 +90,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 
   function navigateModule(module: AppModule) {
     if (module !== activeModule || (module === "travel" && travelScreen !== "library")) {
-      pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined, travelScreen: module === "travel" ? "library" : undefined, travelPlanId: undefined });
+      pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined, noteId: undefined, travelScreen: module === "travel" ? "library" : undefined, travelPlanId: undefined });
     }
     setActiveModule(module);
     if (module === "travel") { setTravelScreen("library"); setSelectedPlan(null); }
@@ -230,6 +231,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
             <button className={activeModule === "todos" ? "active" : ""} onClick={() => navigateModule("todos")}><ListTodo size={17} /><span>To-dos</span></button>
+            <button className={activeModule === "notes" ? "active" : ""} onClick={() => navigateModule("notes")}><StickyNote size={17} /><span>Notes</span></button>
             <button className={activeModule === "shopping" ? "active" : ""} onClick={() => navigateModule("shopping")}><ShoppingCart size={17} /><span>Shopping</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
@@ -242,7 +244,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace travel-workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "notes" ? <NotesModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : <section className="workspace travel-workspace">
         {travelScreen === "library" ? <>
           <header className="topbar checklist-topbar">
             <div><p className="eyebrow">Trips & reservations</p><h1>Travel</h1></div>
