@@ -2,8 +2,8 @@
 Description=Poll HomeOS for Codex requests
 
 [Timer]
-OnBootSec=1min
-OnUnitActiveSec=1min
+OnBootSec=20s
+OnUnitActiveSec=20s
 Persistent=true
 
 [Install]
