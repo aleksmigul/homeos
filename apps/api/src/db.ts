@@ -259,11 +259,14 @@ function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_shared_notes_updated
       ON shared_notes(updated_at DESC);
+    CREATE TABLE IF NOT EXISTS codex_requests (id TEXT PRIMARY KEY, prompt TEXT NOT NULL, status TEXT NOT NULL, response TEXT, error TEXT, created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT);
+    CREATE INDEX IF NOT EXISTS idx_codex_requests_created ON codex_requests(created_at DESC);
   `);
 
   migrateCaptureOwnership();
   migrateTodoLists();
   migrateTodoSharing();
+  migrateCodexRequests();
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE)");
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todo_lists_owner_updated ON todo_lists(owner_email, updated_at DESC)");
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_lists_one_shared ON todo_lists(is_shared) WHERE is_shared = 1");
@@ -274,6 +277,7 @@ function migrateTodoSharing() {
   const columns = all<{ name: string }>("PRAGMA table_info(todo_lists)");
   if (!columns.some((column) => column.name === "is_shared")) getDb().run("ALTER TABLE todo_lists ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0");
 }
+function migrateCodexRequests() { const columns=all<{name:string}>("PRAGMA table_info(codex_requests)"); if(columns.length&&!columns.some(c=>c.name==="kind")) getDb().run("ALTER TABLE codex_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'codex'"); }
 
 function migrateTodoLists() {
   const columns = all<{ name: string }>("PRAGMA table_info(todos)");

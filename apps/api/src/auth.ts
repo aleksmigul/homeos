@@ -48,6 +48,7 @@ export function getAuthenticatedUser(req: Request) {
   const session = readSession(req);
   return session ? { email: session.email, name: session.name, picture: session.picture } : null;
 }
+export function isDeveloper(req: Request) { return Boolean(config.devPanelEmail && readSession(req)?.email === config.devPanelEmail); }
 
 function sessionCookie(value: string, maxAge = sessionLifetimeSeconds) {
   return [
@@ -69,7 +70,7 @@ authRouter.get("/auth/config", (_req, res) => {
 authRouter.get("/auth/me", (req, res) => {
   const user = readSession(req);
   if (!user) return res.status(401).json({ error: "Authentication required" });
-  res.json({ user: { email: user.email, name: user.name, picture: user.picture } });
+  res.json({ user: { email: user.email, name: user.name, picture: user.picture, developer: user.email === config.devPanelEmail } });
 });
 
 authRouter.post("/auth/google", async (req, res) => {
@@ -95,7 +96,7 @@ authRouter.post("/auth/google", async (req, res) => {
 
   const user = { email, name: payload.name ?? email, picture: payload.picture };
   res.setHeader("Set-Cookie", sessionCookie(createSession(user)));
-  res.json({ user });
+  res.json({ user: { ...user, developer: email === config.devPanelEmail } });
 });
 
 authRouter.post("/auth/logout", (_req, res) => {

@@ -27,7 +27,8 @@ import type {
   UpdateTravelRowInput
 } from "@homeos/shared";
 
-export type AuthUser = { email: string; name: string; picture?: string };
+export type AuthUser = { email: string; name: string; picture?: string; developer?: boolean };
+export type CodexRequest = { id:string; kind:string; prompt:string; status:string; response:string|null; error:string|null; createdAt:string; startedAt:string|null; completedAt:string|null };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? "GET").toUpperCase();
@@ -169,6 +170,9 @@ export async function getTodoList(id: string) { return request<{ todoList: TodoL
 export async function renameTodoList(id: string, title: string) { return request<{ todoList: TodoList }>(`/api/todo-lists/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); }
 export async function createTodo(listId: string, text: string) { return request<{ todo: Todo }>(`/api/todo-lists/${listId}/todos`, { method: "POST", body: JSON.stringify({ text }) }); }
 export async function updateTodo(id: string, completed: boolean) { return request<{ todo: Todo }>(`/api/todos/${id}`, { method: "PATCH", body: JSON.stringify({ completed }) }); }
+export async function listCodexRequests() { return request<{requests:CodexRequest[]}>("/api/dev/codex-requests"); }
+export async function createCodexRequest(prompt:string) { return request<{request:CodexRequest}>("/api/dev/codex-requests",{method:"POST",body:JSON.stringify({prompt})}); }
+export async function requestDeploy() { return request<{request:CodexRequest}>("/api/dev/deploy",{method:"POST"}); }
 export async function listNotes() { return request<{ notes: SharedNote[] }>("/api/notes"); }
 export async function getNote(id: string) { return request<{ note: SharedNote }>(`/api/notes/${id}`); }
 export async function createNote(input: CreateSharedNoteInput) { return request<{ note: SharedNote }>("/api/notes", { method: "POST", body: JSON.stringify(input) }); }

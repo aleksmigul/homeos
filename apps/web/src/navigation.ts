@@ -1,4 +1,4 @@
-export type AppModule = "checklists" | "todos" | "notes" | "shopping" | "travel" | "saved";
+export type AppModule = "checklists" | "todos" | "notes" | "shopping" | "travel" | "saved" | "dev";
 export type ChecklistScreenState = { kind: "library" } | { kind: "detail"; id: string } | { kind: "run"; id: string };
 
 export interface HomeNavigationState {

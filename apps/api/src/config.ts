@@ -17,6 +17,8 @@ export const config = {
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean),
   sessionSecret: process.env.AUTH_SESSION_SECRET ?? "",
+  devPanelEmail: (process.env.DEV_PANEL_EMAIL ?? "").trim().toLowerCase(),
+  codexWorkerToken: process.env.CODEX_WORKER_TOKEN ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendWebhookSecret: process.env.RESEND_WEBHOOK_SECRET ?? "",
   travelInboxAddress: (process.env.TRAVEL_INBOX_ADDRESS ?? "travel@os.theannexation.fun").toLowerCase(),
