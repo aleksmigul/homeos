@@ -264,6 +264,7 @@ function migrate() {
   `);
 
   migrateCaptureOwnership();
+  migrateSharedBookmarks();
   migrateTodoLists();
   migrateTodoSharing();
   migrateCodexRequests();
@@ -271,6 +272,25 @@ function migrate() {
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todo_lists_owner_updated ON todo_lists(owner_email, updated_at DESC)");
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_lists_one_shared ON todo_lists(is_shared) WHERE is_shared = 1");
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todos_list_created ON todos(list_id, created_at DESC)");
+}
+
+function migrateSharedBookmarks() {
+  const sharedOwner = "__shared__";
+  const existing = get<{ id: string }>("SELECT id FROM capture_streams WHERE name = 'Bookmarks' COLLATE NOCASE ORDER BY created_at, id LIMIT 1")
+    ?? get<{ id: string }>("SELECT id FROM capture_streams ORDER BY created_at, id LIMIT 1");
+  const id = existing?.id ?? crypto.randomUUID();
+
+  if (!existing) {
+    run("INSERT INTO capture_streams (id, owner_email, name, created_at) VALUES ($id, $owner, 'Bookmarks', $createdAt)", {
+      $id: id,
+      $owner: sharedOwner,
+      $createdAt: new Date().toISOString()
+    });
+  }
+
+  run("UPDATE saved_items SET stream_id = $id WHERE stream_id <> $id", { $id: id });
+  run("DELETE FROM capture_streams WHERE id <> $id", { $id: id });
+  run("UPDATE capture_streams SET owner_email = $owner, name = 'Bookmarks' WHERE id = $id", { $id: id, $owner: sharedOwner });
 }
 
 function migrateTodoSharing() {

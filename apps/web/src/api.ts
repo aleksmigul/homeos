@@ -4,7 +4,6 @@ import type {
   ChecklistRunItem,
   ChecklistSummary,
   CaptureStream,
-  CreateCaptureStreamInput,
   CreateSavedItemInput,
   CreateChecklistInput,
   CreateTravelPlanInput,
@@ -13,9 +12,6 @@ import type {
   TravelEmail,
   TravelRow,
   SavedItem,
-  SharedNote,
-  CreateSharedNoteInput,
-  UpdateSharedNoteInput,
   ShoppingEditLock,
   ShoppingItem,
   ShoppingList,
@@ -135,10 +131,6 @@ export async function listCaptureStreams() {
   return request<{ streams: CaptureStream[] }>("/api/capture-streams");
 }
 
-export async function createCaptureStream(input: CreateCaptureStreamInput) {
-  return request<{ stream: CaptureStream }>("/api/capture-streams", { method: "POST", body: JSON.stringify(input) });
-}
-
 export async function listSavedItems(streamId?: string) {
   const query = streamId ? `?streamId=${encodeURIComponent(streamId)}` : "";
   return request<{ items: SavedItem[] }>(`/api/saved-items${query}`);
@@ -173,12 +165,7 @@ export async function updateTodo(id: string, completed: boolean) { return reques
 export async function listCodexRequests() { return request<{requests:CodexRequest[]}>("/api/dev/codex-requests"); }
 export async function createCodexRequest(prompt:string) { return request<{request:CodexRequest}>("/api/dev/codex-requests",{method:"POST",body:JSON.stringify({prompt})}); }
 export async function requestDeploy() { return request<{request:CodexRequest}>("/api/dev/deploy",{method:"POST"}); }
-export async function listNotes() { return request<{ notes: SharedNote[] }>("/api/notes"); }
-export async function getNote(id: string) { return request<{ note: SharedNote }>(`/api/notes/${id}`); }
-export async function createNote(input: CreateSharedNoteInput) { return request<{ note: SharedNote }>("/api/notes", { method: "POST", body: JSON.stringify(input) }); }
-export async function updateNote(id: string, input: UpdateSharedNoteInput) { return request<{ note: SharedNote }>(`/api/notes/${id}`, { method: "PUT", body: JSON.stringify(input) }); }
-export async function deleteNote(id: string) { if (!navigator.onLine) throw new Error("Offline mode is read-only. Reconnect before deleting notes."); const response = await fetch(`/api/notes/${id}`, { method: "DELETE" }); if (!response.ok) throw new Error(response.status === 404 ? "Note not found" : "Could not delete note"); }
-
+export async function requestPush() { return request<{request:CodexRequest}>("/api/dev/push",{method:"POST"}); }
 export async function warmOfflineCache() {
   if (!navigator.onLine) return;
   const get = async <T>(path: string) => {
@@ -186,14 +173,13 @@ export async function warmOfflineCache() {
     if (!response.ok) throw new Error(`Could not download ${path}`);
     return response.json() as Promise<T>;
   };
-  const [{ travelPlans }, { checklists }, inbox, { streams }, shopping, { todoLists, sharedTodoList }, { notes }] = await Promise.all([
+  const [{ travelPlans }, { checklists }, inbox, { streams }, shopping, { todoLists, sharedTodoList }] = await Promise.all([
     get<{ travelPlans: TravelPlanSummary[] }>("/api/travel-plans"),
     get<{ checklists: ChecklistSummary[] }>("/api/checklists"),
     get<{ address: string; configured: boolean; emails: TravelEmail[] }>("/api/travel-inbox"),
     get<{ streams: CaptureStream[] }>("/api/capture-streams"),
     get<{ current: ShoppingList; archived: ShoppingListSummary[] }>("/api/shopping-lists"),
-    get<{ todoLists: TodoListSummary[]; sharedTodoList: TodoListSummary }>("/api/todo-lists"),
-    get<{ notes: SharedNote[] }>("/api/notes")
+    get<{ todoLists: TodoListSummary[]; sharedTodoList: TodoListSummary }>("/api/todo-lists")
   ]);
   void inbox;
   const [travelDetails, checklistDetails, savedGroups] = await Promise.all([
@@ -207,7 +193,6 @@ export async function warmOfflineCache() {
     ...shopping.archived.map((list) => get(`/api/shopping-lists/${list.id}`)),
     get(`/api/todo-lists/${sharedTodoList.id}`),
     ...todoLists.map((list) => get(`/api/todo-lists/${list.id}`)),
-    ...notes.map((note) => get(`/api/notes/${note.id}`)),
     ...savedGroups.flatMap(({ items }) => items.flatMap((item) => item.attachments.map((attachment) => fetch(attachment.url).then((response) => { if (!response.ok) throw new Error(`Could not download ${attachment.name}`); }))))
   ]);
 }

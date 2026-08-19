@@ -26,7 +26,6 @@ export interface SavedAttachment {
   url: string;
 }
 
-export interface CreateCaptureStreamInput { name: string }
 export interface CreateSavedItemInput {
   streamId: string;
   title?: string;

@@ -1,4 +1,4 @@
-export type AppModule = "checklists" | "todos" | "notes" | "shopping" | "travel" | "saved" | "dev";
+export type AppModule = "checklists" | "todos" | "shopping" | "travel" | "bookmarks" | "voice-notes" | "dev";
 export type ChecklistScreenState = { kind: "library" } | { kind: "detail"; id: string } | { kind: "run"; id: string };
 
 export interface HomeNavigationState {
@@ -14,7 +14,9 @@ export interface HomeNavigationState {
 }
 
 export function currentNavigation(): HomeNavigationState {
-  return window.history.state?.homeos ?? {};
+  const state = window.history.state?.homeos ?? {};
+  if (state.module === "notes" || state.module === "saved") return { ...state, module: "bookmarks", noteId: undefined };
+  return state;
 }
 
 export function pushNavigation(patch: Partial<HomeNavigationState>) {

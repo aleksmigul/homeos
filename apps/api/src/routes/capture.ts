@@ -2,25 +2,21 @@ import fs from "node:fs";
 import express, { Router } from "express";
 import { z } from "zod";
 import { getAuthenticatedUser } from "../auth.js";
-import { createCaptureStream, createSavedItem, deleteSavedItem, getAttachment, listCaptureStreams, listSavedItems, savePendingAttachment } from "../captureRepository.js";
+import { createSavedItem, deleteSavedItem, getAttachment, listCaptureStreams, listSavedItems, savePendingAttachment } from "../captureRepository.js";
 
 export const captureRouter = Router();
 const userEmail = (req: express.Request) => getAuthenticatedUser(req)!.email;
 
 captureRouter.get("/capture-streams", (req, res) => res.json({ streams: listCaptureStreams(userEmail(req)) }));
-captureRouter.post("/capture-streams", (req, res, next) => {
-  try { res.status(201).json({ stream: createCaptureStream(userEmail(req), z.object({ name: z.string().trim().min(1).max(80) }).parse(req.body).name) }); }
-  catch (error) { next(error); }
-});
 captureRouter.get("/saved-items", (req, res, next) => {
-  try { const { streamId } = z.object({ streamId: z.string().optional() }).parse(req.query); res.json({ items: listSavedItems(userEmail(req), streamId) }); }
+  try { z.object({ streamId: z.string().optional() }).parse(req.query); res.json({ items: listSavedItems() }); }
   catch (error) { next(error); }
 });
 captureRouter.post("/saved-items", (req, res, next) => {
   try {
     const input = z.object({ streamId: z.string().min(1), title: z.string().trim().max(300).optional(), text: z.string().trim().max(20000).optional(), url: z.string().trim().max(4000).refine((value) => !value || /^https?:\/\//i.test(value), "Link must use HTTP or HTTPS").optional(), source: z.string().trim().max(80).optional(), attachmentIds: z.array(z.string().uuid()).max(10).optional() }).refine((value) => value.title || value.text || value.url || value.attachmentIds?.length, "Shared item is empty").parse(req.body);
     const item = createSavedItem(userEmail(req), input);
-    if (!item) return res.status(404).json({ error: "Stream or attachment not found" });
+    if (!item) return res.status(404).json({ error: "Attachment not found" });
     res.status(201).json({ item });
   } catch (error) { next(error); }
 });

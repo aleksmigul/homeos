@@ -12,11 +12,11 @@ type AttachmentRow = { id: string; original_name: string; stored_name: string; m
 const mapStream = (row: StreamRow): CaptureStream => ({ id: row.id, name: row.name, itemCount: Number(row.item_count), createdAt: row.created_at });
 const mapAttachment = (row: AttachmentRow): SavedAttachment => ({ id: row.id, name: row.original_name, mimeType: row.mime_type, size: Number(row.size), url: `/api/saved-attachments/${row.id}` });
 
-function ensureBookmarks(ownerEmail: string) {
-  const existing = get<{ id: string }>("SELECT id FROM capture_streams WHERE owner_email = $owner AND name = 'Bookmarks' COLLATE NOCASE", { $owner: ownerEmail });
+function ensureBookmarks() {
+  const existing = get<{ id: string }>("SELECT id FROM capture_streams WHERE owner_email = '__shared__' LIMIT 1");
   if (existing) return existing.id;
   const id = randomUUID();
-  writeTransaction(() => run("INSERT INTO capture_streams (id, owner_email, name, created_at) VALUES ($id, $owner, 'Bookmarks', $createdAt)", { $id: id, $owner: ownerEmail, $createdAt: new Date().toISOString() }));
+  writeTransaction(() => run("INSERT INTO capture_streams (id, owner_email, name, created_at) VALUES ($id, '__shared__', 'Bookmarks', $createdAt)", { $id: id, $createdAt: new Date().toISOString() }));
   return id;
 }
 
@@ -32,40 +32,31 @@ function removeExpiredPendingAttachments(ownerEmail: string) {
 
 export function listCaptureStreams(ownerEmail: string) {
   removeExpiredPendingAttachments(ownerEmail);
-  ensureBookmarks(ownerEmail);
+  ensureBookmarks();
   return all<StreamRow>(`SELECT s.id, s.name, s.created_at, COUNT(i.id) AS item_count
     FROM capture_streams s LEFT JOIN saved_items i ON i.stream_id = s.id
-    WHERE s.owner_email = $owner GROUP BY s.id
-    ORDER BY CASE WHEN s.name = 'Bookmarks' COLLATE NOCASE THEN 0 ELSE 1 END, s.name COLLATE NOCASE`, { $owner: ownerEmail }).map(mapStream);
+    WHERE s.owner_email = '__shared__' GROUP BY s.id`, {}).map(mapStream);
 }
 
-export function createCaptureStream(ownerEmail: string, name: string) {
-  const id = randomUUID(); const createdAt = new Date().toISOString();
-  writeTransaction(() => run("INSERT INTO capture_streams (id, owner_email, name, created_at) VALUES ($id, $owner, $name, $createdAt)", { $id: id, $owner: ownerEmail, $name: name, $createdAt: createdAt }));
-  return mapStream({ id, name, item_count: 0, created_at: createdAt });
-}
-
-function attachmentsForItems(itemIds: string[], ownerEmail: string) {
+function attachmentsForItems(itemIds: string[]) {
   const result = new Map<string, SavedAttachment[]>();
   for (const itemId of itemIds) {
-    result.set(itemId, all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE item_id = $itemId AND owner_email = $owner", { $itemId: itemId, $owner: ownerEmail }).map(mapAttachment));
+    result.set(itemId, all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE item_id = $itemId", { $itemId: itemId }).map(mapAttachment));
   }
   return result;
 }
 
-export function listSavedItems(ownerEmail: string, streamId?: string) {
-  const rows = streamId
-    ? all<ItemRow>("SELECT i.* FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE s.owner_email = $owner AND i.stream_id = $streamId ORDER BY i.created_at DESC", { $owner: ownerEmail, $streamId: streamId })
-    : all<ItemRow>("SELECT i.* FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE s.owner_email = $owner ORDER BY i.created_at DESC", { $owner: ownerEmail });
-  const attachments = attachmentsForItems(rows.map((row) => row.id), ownerEmail);
+export function listSavedItems() {
+  const rows = all<ItemRow>("SELECT i.* FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE s.owner_email = '__shared__' ORDER BY i.created_at DESC");
+  const attachments = attachmentsForItems(rows.map((row) => row.id));
   return rows.map((row): SavedItem => ({ id: row.id, streamId: row.stream_id, title: row.title, text: row.text_content, url: row.url, source: row.source, createdAt: row.created_at, attachments: attachments.get(row.id) ?? [] }));
 }
 
 export function createSavedItem(ownerEmail: string, input: CreateSavedItemInput) {
-  if (!get<{ id: string }>("SELECT id FROM capture_streams WHERE id = $id AND owner_email = $owner", { $id: input.streamId, $owner: ownerEmail })) return null;
+  const streamId = ensureBookmarks();
   const attachmentIds = input.attachmentIds ?? [];
   if (attachmentIds.some((id) => !get("SELECT id FROM saved_attachments WHERE id = $id AND owner_email = $owner AND item_id IS NULL", { $id: id, $owner: ownerEmail }))) return null;
-  const item: SavedItem = { id: randomUUID(), streamId: input.streamId, title: input.title ?? "", text: input.text ?? "", url: input.url ?? "", source: input.source ?? "manual", createdAt: new Date().toISOString(), attachments: [] };
+  const item: SavedItem = { id: randomUUID(), streamId, title: input.title ?? "", text: input.text ?? "", url: input.url ?? "", source: input.source ?? "manual", createdAt: new Date().toISOString(), attachments: [] };
   writeTransaction(() => {
     run(`INSERT INTO saved_items (id, stream_id, title, text_content, url, source, created_at) VALUES ($id, $streamId, $title, $text, $url, $source, $createdAt)`, { $id: item.id, $streamId: item.streamId, $title: item.title, $text: item.text, $url: item.url, $source: item.source, $createdAt: item.createdAt });
     for (const id of attachmentIds) run("UPDATE saved_attachments SET item_id = $itemId WHERE id = $id AND owner_email = $owner", { $itemId: item.id, $id: id, $owner: ownerEmail });
@@ -73,10 +64,10 @@ export function createSavedItem(ownerEmail: string, input: CreateSavedItemInput)
   return { ...item, attachments: attachmentIds.map((id) => mapAttachment(get<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE id = $id", { $id: id })!)) };
 }
 
-export function deleteSavedItem(ownerEmail: string, id: string) {
-  const item = get<{ id: string }>("SELECT i.id FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE i.id = $id AND s.owner_email = $owner", { $id: id, $owner: ownerEmail });
+export function deleteSavedItem(_ownerEmail: string, id: string) {
+  const item = get<{ id: string }>("SELECT i.id FROM saved_items i JOIN capture_streams s ON s.id = i.stream_id WHERE i.id = $id AND s.owner_email = '__shared__'", { $id: id });
   if (!item) return false;
-  const attachments = all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE item_id = $id AND owner_email = $owner", { $id: id, $owner: ownerEmail });
+  const attachments = all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE item_id = $id", { $id: id });
   writeTransaction(() => run("DELETE FROM saved_items WHERE id = $id", { $id: id }));
   for (const attachment of attachments) {
     try { fs.unlinkSync(path.join(config.uploadsPath, attachment.stored_name)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.error("Could not remove saved attachment", attachment.stored_name, error); }
@@ -96,6 +87,8 @@ export function savePendingAttachment(ownerEmail: string, originalName: string, 
 }
 
 export function getAttachment(ownerEmail: string, id: string) {
-  const row = get<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE id = $id AND owner_email = $owner", { $id: id, $owner: ownerEmail });
+  const row = get<AttachmentRow>(`SELECT a.id, a.original_name, a.stored_name, a.mime_type, a.size
+    FROM saved_attachments a LEFT JOIN saved_items i ON i.id = a.item_id
+    WHERE a.id = $id AND (a.owner_email = $owner OR i.id IS NOT NULL)`, { $id: id, $owner: ownerEmail });
   return row ? { ...mapAttachment(row), path: path.join(config.uploadsPath, row.stored_name) } : null;
 }

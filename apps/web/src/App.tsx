@@ -1,20 +1,20 @@
-import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, Code2, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, NotebookPen, Plane, Plus, Save, ShoppingCart, StickyNote, WifiOff, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, Code2, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, Mic, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
 import { FormEvent, TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
 import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
 import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
-import { SavedModule, type SharedDraft } from "./SavedModule";
+import { BookmarksModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 import { ShoppingModule } from "./ShoppingModule";
 import { TodoModule } from "./TodoModule";
-import { NotesModule } from "./NotesModule";
 import { DevModule } from "./DevModule";
+import { VoiceNotesModule } from "./VoiceNotesModule";
 import { clearOfflineAccount, configureOfflineAccount, storagePressure } from "./offline";
 
 const today = new Date().toISOString().slice(0, 10);
-const baseModules: AppModule[] = ["checklists", "todos", "notes", "shopping", "travel", "saved"];
+const baseModules: AppModule[] = ["checklists", "todos", "shopping", "travel", "bookmarks", "voice-notes"];
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -40,7 +40,7 @@ export function App() {
 
 function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(() => readSharedDraft());
-  const [activeModule, setActiveModule] = useState<AppModule>(() => readSharedDraft() ? "saved" : currentNavigation().module ?? "checklists");
+  const [activeModule, setActiveModule] = useState<AppModule>(() => readSharedDraft() ? "bookmarks" : currentNavigation().module ?? "checklists");
   const [travelScreen, setTravelScreen] = useState<"library" | "inbox" | "plan">(() => currentNavigation().travelScreen ?? "library");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
@@ -233,10 +233,10 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
             <button className={activeModule === "todos" ? "active" : ""} onClick={() => navigateModule("todos")}><ListTodo size={17} /><span>To-dos</span></button>
-            <button className={activeModule === "notes" ? "active" : ""} onClick={() => navigateModule("notes")}><StickyNote size={17} /><span>Notes</span></button>
             <button className={activeModule === "shopping" ? "active" : ""} onClick={() => navigateModule("shopping")}><ShoppingCart size={17} /><span>Shopping</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
-            <button className={activeModule === "saved" ? "active" : ""} onClick={() => navigateModule("saved")}><Bookmark size={17} /><span>Saved</span></button>
+            <button className={activeModule === "bookmarks" ? "active" : ""} onClick={() => navigateModule("bookmarks")}><Bookmark size={17} /><span>Bookmarks</span></button>
+            <button className={activeModule === "voice-notes" ? "active" : ""} onClick={() => navigateModule("voice-notes")}><Mic size={17} /><span>Voice notes</span></button>
             {user.developer ? <button className={activeModule === "dev" ? "active" : ""} onClick={() => navigateModule("dev")}><Code2 size={17} /><span>Dev</span></button> : null}
           </nav>
         </div>
@@ -247,7 +247,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "notes" ? <NotesModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "saved" ? <SavedModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : activeModule === "dev" ? <DevModule /> : <section className="workspace travel-workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "bookmarks" ? <BookmarksModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : activeModule === "voice-notes" ? <VoiceNotesModule /> : activeModule === "dev" ? <DevModule /> : <section className="workspace travel-workspace">
         {travelScreen === "library" ? <>
           <header className="topbar checklist-topbar">
             <div><p className="eyebrow">Trips & reservations</p><h1>Travel</h1></div>
