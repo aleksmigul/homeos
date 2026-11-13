@@ -64,6 +64,7 @@ in `AUTH_ALLOWED_EMAILS` can create a signed session cookie.
 
 ## Recent Decisions
 
+- Completed code changes must be committed and pushed to GitHub as part of the normal workflow, before an authorized deployment. This user preference is recorded in `AGENTS.md`.
 - Commits were intentionally kept small/coherent.
 - The app is published to the GitHub repo on `main`; the repository is currently public.
 - The visible app name is **The Annexation** in the sidebar, browser title, README, and API startup log.
