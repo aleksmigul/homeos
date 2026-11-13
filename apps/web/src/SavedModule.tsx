@@ -1,7 +1,7 @@
-import { ArrowLeft, Bookmark, BookmarkPlus, ExternalLink, Inbox, Loader2, Share2, Trash2, X } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, Bookmark, BookmarkPlus, ClipboardPaste, ExternalLink, Inbox, Loader2, Share2, Trash2, X } from "lucide-react";
+import { ClipboardEvent, FormEvent, useEffect, useState } from "react";
 import type { CaptureStream, CreateSavedItemInput, SavedAttachment, SavedItem } from "@homeos/shared";
-import { createSavedItem, deleteSavedItem, listCaptureStreams, listSavedItems } from "./api";
+import { createSavedItem, deleteSavedItem, listCaptureStreams, listSavedItems, uploadSavedFile } from "./api";
 import { currentNavigation, pushNavigation } from "./navigation";
 
 export interface SharedDraft { title: string; text: string; url: string; attachmentIds: string[]; error: string }
@@ -28,7 +28,7 @@ export function BookmarksModule({ sharedDraft, onSharedDraftDone }: { sharedDraf
   useEffect(() => {
     const syncImage = () => {
       const id = currentNavigation().imageId;
-      setOpenImage(id ? items.flatMap((item) => item.attachments).find((attachment) => attachment.id === id) ?? null : null);
+      setOpenImage(id ? items.flatMap((item) => item.attachments).find((attachment) => attachment.id === id && isPreviewable(attachment)) ?? null : null);
     };
     syncImage();
     window.addEventListener("popstate", syncImage);
@@ -48,7 +48,7 @@ export function BookmarksModule({ sharedDraft, onSharedDraftDone }: { sharedDraf
       {loading ? <div className="saved-empty"><Loader2 className="spin" /></div> : items.length ? <div className="saved-list">{items.map((item) => <article className="saved-card" key={item.id}>
         <div className="saved-card-head"><span><Share2 size={14} />{item.source === "share-target" ? "Shared" : "Saved"}</span><div><time>{new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time><button type="button" onClick={() => void removeItem(item)} aria-label="Delete saved item"><Trash2 size={15} /></button></div></div>
         {item.title ? <h2>{item.title}</h2> : null}{item.text ? <p>{item.text}</p> : null}
-        {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => <button type="button" onClick={() => viewImage(attachment)} key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></button>)}</div> : null}
+        {item.attachments.length ? <div className="saved-images">{item.attachments.map((attachment) => isPreviewable(attachment) ? <button type="button" onClick={() => viewImage(attachment)} key={attachment.id}><img src={attachment.url} alt={attachment.name} loading="lazy" /></button> : <a className="saved-file" key={attachment.id} href={attachment.url} download={attachment.name}>{attachment.name} · {formatSize(attachment.size)}</a>)}</div> : null}
         {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{displayUrl(item.url)}<ExternalLink size={14} /></a> : null}
       </article>)}</div> : <div className="saved-empty"><Inbox size={30} /><h2>Nothing here yet</h2><p>Add a bookmark here, or share a link or message to The Annexation.</p><button className="primary-button add-action" type="button" onClick={() => setAddingBookmark(true)}><BookmarkPlus size={17} /><span>Add bookmark</span></button></div>}
     </div>
@@ -63,25 +63,51 @@ function ManualBookmarkDialog({ streams, initialStreamId, onCancel, onSave }: { 
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
+  const [attachments, setAttachments] = useState<SavedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  async function uploadFiles(files: File[]) {
+    if (!files.length || uploading || saving) return;
+    if (attachments.length + files.length > 10) { setError("A bookmark can have up to 10 files."); return; }
+    if (files.some((file) => file.size > 12 * 1024 * 1024)) { setError("Each file must be 12 MB or smaller."); return; }
+    setUploading(true); setError("");
+    try {
+      for (const file of files) {
+        const { attachment } = await uploadSavedFile(file);
+        setAttachments((current) => [...current, attachment]);
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not upload file"); }
+    finally { setUploading(false); }
+  }
+
+  async function pasteFiles(event: ClipboardEvent<HTMLFormElement>) {
+    const files = Array.from(event.clipboardData.files);
+    if (!files.length) return;
+    event.preventDefault();
+    await uploadFiles(files);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const normalizedUrl = normalizeUrl(url);
-    if (!streamId || !(title.trim() || text.trim() || normalizedUrl)) return;
+    if (!streamId || uploading || !(title.trim() || text.trim() || normalizedUrl || attachments.length)) return;
     setSaving(true); setError("");
-    try { await onSave({ streamId, title, text, url: normalizedUrl, source: "manual" }); }
+    try { await onSave({ streamId, title, text, url: normalizedUrl, attachmentIds: attachments.map((attachment) => attachment.id), source: "manual" }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not add bookmark"); setSaving(false); }
   }
 
-  return <div className="modal-backdrop share-backdrop"><form className="share-dialog" onSubmit={submit}>
+  return <div className="modal-backdrop share-backdrop"><form className="share-dialog" onSubmit={submit} onPaste={(event) => void pasteFiles(event)}>
     <div className="share-dialog-head"><div><p className="eyebrow">Shared bookmarks</p><h2>Add a bookmark</h2></div><button type="button" onClick={onCancel} aria-label="Cancel"><X size={20} /></button></div>
     <label><span>Title <small className="optional">Optional</small></span><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Something worth keeping" /></label>
     <label><span>Link <small className="optional">Optional</small></span><input inputMode="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com/article" /></label>
     <label><span>Notes <small className="optional">Optional</small></span><textarea rows={5} value={text} onChange={(event) => setText(event.target.value)} placeholder="Why are you saving this?" /></label>
+    <label><span>Files <small className="optional">Up to 10 files, 12 MB each</small></span><input type="file" multiple disabled={uploading || saving} onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} /></label>
+    <div className="paste-images-hint"><ClipboardPaste size={17} /><span>{uploading ? "Uploading files…" : "You can also paste files anywhere in this window"}</span></div>
+    {attachments.length ? <div className="share-images pasted-images">{attachments.map((attachment) => <div key={attachment.id}>{isPreviewable(attachment) ? <img src={attachment.url} alt={attachment.name} /> : <span className="saved-file">{attachment.name} · {formatSize(attachment.size)}</span>}<button type="button" onClick={() => setAttachments((current) => current.filter(({ id }) => id !== attachment.id))} aria-label={`Remove ${attachment.name}`}><X size={15} /></button></div>)}</div> : null}
     {error ? <p className="form-error">{error}</p> : null}
-    <button className="primary-button share-save" disabled={saving || !streamId || !(title.trim() || text.trim() || url.trim())}>{saving ? <Loader2 className="spin" size={17} /> : <BookmarkPlus size={17} />}Add bookmark</button>
+    <button className="primary-button share-save" disabled={saving || uploading || !streamId || !(title.trim() || text.trim() || url.trim() || attachments.length)}>{saving || uploading ? <Loader2 className="spin" size={17} /> : <BookmarkPlus size={17} />}Add bookmark</button>
   </form></div>;
 }
 
@@ -99,10 +125,12 @@ function ShareCapture({ draft, streams, onCancel, onSave }: { draft: SharedDraft
     <label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional title" /></label>
     <label>Message<textarea rows={5} value={text} onChange={(event) => setText(event.target.value)} placeholder="Shared text" /></label>
     <label>Link<input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" /></label>
-    {draft.attachmentIds.length ? <div className="share-images">{draft.attachmentIds.map((id) => <img src={`/api/saved-attachments/${id}`} alt="Shared preview" key={id} />)}</div> : null}
+    {draft.attachmentIds.length ? <div className="share-images">{draft.attachmentIds.map((id) => <a href={`/api/saved-attachments/${id}`} key={id}>Shared file {draft.attachmentIds.indexOf(id) + 1}</a>)}</div> : null}
     {draft.error || error ? <p className="form-error">{error || draft.error}</p> : null}<button className="primary-button share-save" disabled={saving || !streamId || !(title || text || url || draft.attachmentIds.length)}>{saving ? <Loader2 className="spin" size={17} /> : <Bookmark size={17} />}Save</button>
   </form></div>;
 }
 
 function displayUrl(value: string) { try { const url = new URL(value); return `${url.hostname}${url.pathname === "/" ? "" : url.pathname}`; } catch { return value; } }
 function normalizeUrl(value: string) { const trimmed = value.trim(); return trimmed && !/^https?:\/\//i.test(trimmed) ? `https://${trimmed}` : trimmed; }
+function isPreviewable(attachment: SavedAttachment) { return ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"].includes(attachment.mimeType); }
+function formatSize(bytes: number) { return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }

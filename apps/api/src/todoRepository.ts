@@ -8,14 +8,7 @@ const mapTodo = (row: TodoRow): Todo => ({ id: row.id, listId: row.list_id, text
 const mapList = (row: ListRow): TodoListSummary => ({ id: row.id, title: row.title, shared: Boolean(row.is_shared), openCount: Number(row.open_count), completedCount: Number(row.completed_count), createdAt: row.created_at, updatedAt: row.updated_at });
 const listSelect = `SELECT l.id, l.title, l.is_shared, l.created_at, l.updated_at, SUM(CASE WHEN t.id IS NOT NULL AND t.completed_at IS NULL THEN 1 ELSE 0 END) AS open_count, SUM(CASE WHEN t.completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_count FROM todo_lists l LEFT JOIN todos t ON t.list_id = l.id`;
 
-function ensureTodoList(ownerEmail: string) {
-  const existing = get<{ id: string }>("SELECT id FROM todo_lists WHERE owner_email = $owner AND is_shared = 0 ORDER BY updated_at DESC LIMIT 1", { $owner: ownerEmail });
-  if (existing) return existing.id;
-  return createTodoList(ownerEmail, "Personal").id;
-}
-
 export function listTodoLists(ownerEmail: string) {
-  ensureTodoList(ownerEmail);
   return all<ListRow>(`${listSelect} WHERE l.owner_email = $owner AND l.is_shared = 0 GROUP BY l.id ORDER BY l.updated_at DESC`, { $owner: ownerEmail }).map(mapList);
 }
 
@@ -65,4 +58,23 @@ export function setTodoCompleted(ownerEmail: string, id: string, completed: bool
   const now = new Date().toISOString(); const completedAt = completed ? now : null;
   writeTransaction(() => { run("UPDATE todos SET completed_at = $completedAt WHERE id = $id", { $completedAt: completedAt, $id: id }); run("UPDATE todo_lists SET updated_at = $now WHERE id = $listId", { $now: now, $listId: row.list_id }); });
   return mapTodo({ ...row, completed_at: completedAt });
+}
+
+export function deleteTodoList(ownerEmail: string, id: string): boolean {
+  if (!getTodoList(ownerEmail, id)) return false;
+  writeTransaction(() => {
+    run("DELETE FROM todos WHERE list_id = $id", { $id: id });
+    run("DELETE FROM todo_lists WHERE id = $id", { $id: id });
+  });
+  return true;
+}
+
+export function deleteTodo(ownerEmail: string, id: string): TodoList | null {
+  const row = get<{ list_id: string }>("SELECT t.list_id FROM todos t JOIN todo_lists l ON l.id = t.list_id WHERE t.id = $id AND (l.owner_email = $owner OR l.is_shared = 1)", { $id: id, $owner: ownerEmail });
+  if (!row) return null;
+  writeTransaction(() => {
+    run("DELETE FROM todos WHERE id = $id", { $id: id });
+    run("UPDATE todo_lists SET updated_at = $now WHERE id = $id", { $id: row.list_id, $now: new Date().toISOString() });
+  });
+  return getTodoList(ownerEmail, row.list_id);
 }

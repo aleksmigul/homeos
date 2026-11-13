@@ -22,7 +22,7 @@ function ensureBookmarks() {
 
 function removeExpiredPendingAttachments(ownerEmail: string) {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const expired = all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE owner_email = $owner AND item_id IS NULL AND created_at < $cutoff", { $owner: ownerEmail, $cutoff: cutoff });
+  const expired = all<AttachmentRow>("SELECT id, original_name, stored_name, mime_type, size FROM saved_attachments WHERE owner_email = $owner AND item_id IS NULL AND created_at < $cutoff AND NOT EXISTS (SELECT 1 FROM travel_rows WHERE instr(notes, saved_attachments.id) > 0)", { $owner: ownerEmail, $cutoff: cutoff });
   if (!expired.length) return;
   for (const attachment of expired) {
     try { fs.unlinkSync(path.join(config.uploadsPath, attachment.stored_name)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -75,12 +75,10 @@ export function deleteSavedItem(_ownerEmail: string, id: string) {
   return true;
 }
 
-const imageExtensions: Record<string, string> = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif", "image/heic": ".heic", "image/heif": ".heif" };
 export function savePendingAttachment(ownerEmail: string, originalName: string, mimeType: string, bytes: Buffer) {
-  const extension = imageExtensions[mimeType];
-  if (!extension) return null;
+  mimeType = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(mimeType) ? mimeType.toLowerCase() : "application/octet-stream";
   fs.mkdirSync(config.uploadsPath, { recursive: true, mode: 0o700 });
-  const id = randomUUID(); const storedName = `${id}${extension}`;
+  const id = randomUUID(); const storedName = `${id}.bin`;
   fs.writeFileSync(path.join(config.uploadsPath, storedName), bytes, { mode: 0o600, flag: "wx" });
   writeTransaction(() => run("INSERT INTO saved_attachments (id, owner_email, item_id, original_name, stored_name, mime_type, size, created_at) VALUES ($id, $owner, NULL, $name, $stored, $mime, $size, $createdAt)", { $id: id, $owner: ownerEmail, $name: originalName.slice(0, 255), $stored: storedName, $mime: mimeType, $size: bytes.length, $createdAt: new Date().toISOString() }));
   return mapAttachment({ id, original_name: originalName, stored_name: storedName, mime_type: mimeType, size: bytes.length });
@@ -89,6 +87,6 @@ export function savePendingAttachment(ownerEmail: string, originalName: string, 
 export function getAttachment(ownerEmail: string, id: string) {
   const row = get<AttachmentRow>(`SELECT a.id, a.original_name, a.stored_name, a.mime_type, a.size
     FROM saved_attachments a LEFT JOIN saved_items i ON i.id = a.item_id
-    WHERE a.id = $id AND (a.owner_email = $owner OR i.id IS NOT NULL)`, { $id: id, $owner: ownerEmail });
+    WHERE a.id = $id AND (a.owner_email = $owner OR i.id IS NOT NULL OR EXISTS (SELECT 1 FROM travel_rows WHERE instr(notes, a.id) > 0))`, { $id: id, $owner: ownerEmail });
   return row ? { ...mapAttachment(row), path: path.join(config.uploadsPath, row.stored_name) } : null;
 }

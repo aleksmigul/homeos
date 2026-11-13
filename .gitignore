@@ -6,6 +6,9 @@ dist/
 !.env.example
 *.log
 *.err
-data/*.db
-data/*.db-*
+# Local databases, uploads, snapshots, and runtime/compiler caches
+data/
 .release/
+
+apps/web/test-results/
+apps/web/playwright-report/

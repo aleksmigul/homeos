@@ -107,6 +107,18 @@ export function createTravelPlan(input: CreateTravelPlanInput): TravelPlan {
   return plan;
 }
 
+export function deleteTravelPlan(id: string): boolean {
+  if (!get<PlanRecord>("SELECT * FROM travel_plans WHERE id = :id", { ":id": id })) {
+    return false;
+  }
+
+  writeTransaction(() => {
+    run("DELETE FROM travel_rows WHERE plan_id = :id", { ":id": id });
+    run("DELETE FROM travel_plans WHERE id = :id", { ":id": id });
+  });
+  return true;
+}
+
 export function updateTravelRow(id: string, input: UpdateTravelRowInput): TravelRow | null {
   const row = get<RowRecord>("SELECT * FROM travel_rows WHERE id = :id", { ":id": id });
   if (!row) {

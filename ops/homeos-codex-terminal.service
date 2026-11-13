@@ -1,0 +1,29 @@
+[Unit]
+Description=HomeOS interactive Codex terminal bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=homeos
+WorkingDirectory=/root/homeos
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=CODEX_TERMINAL_SOCKET=/run/homeos-codex/bridge.sock
+Environment=CODEX_TERMINAL_TMUX_SOCKET=/run/homeos-codex/tmux.sock
+ExecStart=/usr/bin/node /srv/homeos/apps/api/dist/codexTerminalBridge.js
+RuntimeDirectory=homeos-codex
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+UMask=0077
+Restart=on-failure
+RestartSec=3
+# Keep the independent tmux server and its sessions alive across bridge restarts.
+KillMode=process
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/root/homeos /root/.codex /root/.cache /root/.local/share /run/homeos-codex
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -237,3 +237,33 @@ function mapRunItem(record: RunItemRecord): ChecklistRunItem {
     checkedAt: record.checked_at
   };
 }
+
+export function deleteChecklist(id: string): boolean {
+  if (!getChecklist(id)) return false;
+  writeTransaction(() => {
+    run("DELETE FROM checklist_run_items WHERE run_id IN (SELECT id FROM checklist_runs WHERE checklist_id = :id)", { ":id": id });
+    run("DELETE FROM checklist_items WHERE checklist_id = :id", { ":id": id });
+    run("DELETE FROM checklist_runs WHERE checklist_id = :id", { ":id": id });
+    run("DELETE FROM checklists WHERE id = :id", { ":id": id });
+  });
+  return true;
+}
+
+export function deleteChecklistItem(id: string): Checklist | null {
+  const item = get<ChecklistItemRecord>("SELECT * FROM checklist_items WHERE id = :id", { ":id": id });
+  if (!item) return null;
+  writeTransaction(() => {
+    run("DELETE FROM checklist_items WHERE id = :id", { ":id": id });
+    run("UPDATE checklists SET updated_at = :now WHERE id = :id", { ":id": item.checklist_id, ":now": new Date().toISOString() });
+  });
+  return requireChecklist(item.checklist_id);
+}
+
+export function deleteChecklistRun(id: string): boolean {
+  if (!getChecklistRun(id)) return false;
+  writeTransaction(() => {
+    run("DELETE FROM checklist_run_items WHERE run_id = :id", { ":id": id });
+    run("DELETE FROM checklist_runs WHERE id = :id", { ":id": id });
+  });
+  return true;
+}

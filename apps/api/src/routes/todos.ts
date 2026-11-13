@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getAuthenticatedUser } from "../auth.js";
-import { createTodo, createTodoList, getSharedTodoList, getTodoList, listTodoLists, renameTodoList, setTodoCompleted } from "../todoRepository.js";
+import { deleteTodo, deleteTodoList, createTodo, createTodoList, getSharedTodoList, getTodoList, listTodoLists, renameTodoList, setTodoCompleted } from "../todoRepository.js";
 
 export const todoRouter = Router();
 const owner = (req: Parameters<typeof getAuthenticatedUser>[0]) => getAuthenticatedUser(req)!.email;
@@ -13,3 +13,13 @@ todoRouter.get("/todo-lists/:id", (req, res) => { const todoList = getTodoList(o
 todoRouter.patch("/todo-lists/:id", (req, res, next) => { try { const todoList = renameTodoList(owner(req), req.params.id, titleSchema.parse(req.body).title); if (!todoList) return res.status(404).json({ error: "To-do list not found" }); res.json({ todoList }); } catch (error) { next(error); } });
 todoRouter.post("/todo-lists/:id/todos", (req, res, next) => { try { const { text } = z.object({ text: z.string().trim().min(1).max(500) }).parse(req.body); const todo = createTodo(owner(req), req.params.id, text); if (!todo) return res.status(404).json({ error: "To-do list not found" }); res.status(201).json({ todo }); } catch (error) { next(error); } });
 todoRouter.patch("/todos/:id", (req, res, next) => { try { const { completed } = z.object({ completed: z.boolean() }).parse(req.body); const todo = setTodoCompleted(owner(req), req.params.id, completed); if (!todo) return res.status(404).json({ error: "To-do not found" }); res.json({ todo }); } catch (error) { next(error); } });
+
+todoRouter.delete("/todo-lists/:id", (req, res) => {
+  if (!deleteTodoList(owner(req), req.params.id)) return res.status(404).json({ error: "To-do list not found" });
+  res.json({ deleted: true });
+});
+todoRouter.delete("/todos/:id", (req, res) => {
+  const todoList = deleteTodo(owner(req), req.params.id);
+  if (!todoList) return res.status(404).json({ error: "To-do not found" });
+  res.json({ todoList });
+});

@@ -1,5 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+# Build/check must use the explicitly installed development dependencies, even
+# when the deploy worker runs with NODE_ENV=production.
+verifyDepsBeforeRun: false
 allowBuilds:
   esbuild: true

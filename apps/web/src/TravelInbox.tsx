@@ -56,11 +56,11 @@ export function TravelInbox() {
   );
 }
 
-function EmailReader({ email, onBack }: { email: TravelEmail; onBack: () => void }) {
+export function EmailReader({ email, onBack, backLabel = "Inbox" }: { email: TravelEmail; onBack: () => void; backLabel?: string }) {
   const body = useMemo(() => email.text?.trim() || htmlToText(email.html) || "This message has no readable body.", [email]);
   return (
     <article className="email-reader">
-      <button className="email-back" type="button" onClick={onBack}><ArrowLeft size={18} />Inbox</button>
+      <button className="email-back" type="button" onClick={onBack}><ArrowLeft size={18} />{backLabel}</button>
       <header><p className="eyebrow">Received {formatDateTime(email.receivedAt)}</p><h2>{email.subject}</h2><div className="email-participants"><strong>From</strong><span>{email.sender}</span><strong>To</strong><span>{email.recipients.join(", ")}</span></div></header>
       {email.attachments.length ? <div className="attachment-list">{email.attachments.map((attachment) => <span key={attachment.id}><Paperclip size={14} /><span>{attachment.filename}<small>{formatBytes(attachment.size)}</small></span></span>)}</div> : null}
       <pre className="email-body">{body}</pre>

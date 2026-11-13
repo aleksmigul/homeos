@@ -5,5 +5,5 @@ import { listTravelEmails } from "../travelEmailRepository.js";
 export const travelInboxRouter = Router();
 
 travelInboxRouter.get("/travel-inbox", (_req, res) => {
-  res.json({ address: config.travelInboxAddress, configured: Boolean(config.resendApiKey && config.resendWebhookSecret), emails: listTravelEmails() });
+  res.json({ address: config.travelInboxAddress, configured: Boolean(config.travelMailPath || (config.resendApiKey && config.resendWebhookSecret)), emails: listTravelEmails() });
 });

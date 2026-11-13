@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { createTravelPlan, getTravelPlan, listTravelPlans, updateTravelRow } from "../travelRepository.js";
+import { createTravelPlan, deleteTravelPlan, getTravelPlan, listTravelPlans, updateTravelRow } from "../travelRepository.js";
+import { listTravelEmails } from "../travelEmailRepository.js";
+import { emailMatchesTrip } from "../travelEmailMatching.js";
 
 export const travelRouter = Router();
 
@@ -40,6 +42,21 @@ travelRouter.get("/travel-plans/:id", (req, res) => {
   res.json({ travelPlan: plan });
 });
 
+travelRouter.get("/travel-plans/:id/emails", (req, res) => {
+  const plan = getTravelPlan(req.params.id);
+  if (!plan) return res.status(404).json({ error: "Travel plan not found" });
+  res.json({ emails: listTravelEmails().filter((email) => emailMatchesTrip(email, plan)) });
+});
+
+travelRouter.delete("/travel-plans/:id", (req, res) => {
+  if (!deleteTravelPlan(req.params.id)) {
+    res.status(404).json({ error: "Travel plan not found" });
+    return;
+  }
+
+  res.status(204).end();
+});
+
 travelRouter.patch("/travel-rows/:id", (req, res, next) => {
   try {
     const input = updateTravelRowSchema.parse(req.body);
@@ -54,4 +71,3 @@ travelRouter.patch("/travel-rows/:id", (req, res, next) => {
     next(error);
   }
 });
-

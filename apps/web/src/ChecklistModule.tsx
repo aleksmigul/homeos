@@ -1,7 +1,8 @@
-import { ArrowLeft, Check, CheckCircle2, ChevronRight, ClipboardCheck, History, ListChecks, Pencil, Play, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ChevronRight, ClipboardCheck, History, ListChecks, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Checklist, ChecklistRun, ChecklistSummary, CreateChecklistInput } from "@homeos/shared";
 import {
+  deleteChecklist, deleteChecklistItem, deleteChecklistRun,
   completeChecklistRun,
   createChecklist,
   getChecklist,
@@ -123,6 +124,24 @@ export function ChecklistModule() {
     setSelected(detail.checklist);
   }
 
+  const [deleting, setDeleting] = useState(false);
+  async function remove(kind: "checklist" | "item" | "run", id: string, label: string) {
+    const detail = kind === "checklist" ? " All items and run history will also be deleted." : kind === "item" ? " This removes it from the template; existing runs keep their items." : " This run and its recorded progress will be deleted.";
+    if (deleting || !window.confirm(`Delete “${label}”?${detail} This cannot be undone.`)) return;
+    setDeleting(true); setError("");
+    try {
+      if (kind === "checklist") {
+        await deleteChecklist(id); setSelected(null); setActiveRun(null); setScreen({ kind: "library" });
+        pushNavigation({ module: "checklists", checklist: { kind: "library" } });
+      } else if (kind === "item") setSelected((await deleteChecklistItem(id)).checklist);
+      else {
+        await deleteChecklistRun(id);
+        if (selected) setSelected((await getChecklist(selected.id)).checklist);
+      }
+      await refreshLibrary();
+    } catch (cause) { setError(message(cause)); } finally { setDeleting(false); }
+  }
+
   function back() {
     setError("");
     window.history.back();
@@ -139,6 +158,10 @@ export function ChecklistModule() {
           checklist={selected}
           error={error}
           onBack={back}
+          deleting={deleting}
+          onDelete={() => void remove("checklist", selected.id, selected.title)}
+          onDeleteItem={(id, label) => void remove("item", id, label)}
+          onDeleteRun={(id) => void remove("run", id, "checklist run")}
           onEdit={() => setEditing(selected)}
           onRun={() => void beginRun()}
           onOpenRun={(id) => void openRun(id)}
@@ -178,7 +201,11 @@ export function ChecklistModule() {
   );
 }
 
-function ChecklistDetail({ checklist, error, onBack, onEdit, onRun, onOpenRun }: {
+function ChecklistDetail({ checklist, error, onBack, onEdit, onRun, onOpenRun, deleting, onDelete, onDeleteItem, onDeleteRun }: {
+  deleting: boolean;
+  onDelete: () => void;
+  onDeleteItem: (id: string, label: string) => void;
+  onDeleteRun: (id: string) => void;
   checklist: Checklist;
   error: string;
   onBack: () => void;
@@ -191,13 +218,14 @@ function ChecklistDetail({ checklist, error, onBack, onEdit, onRun, onOpenRun }:
       <header className="topbar detail-topbar">
         <button className="icon-button" onClick={onBack} aria-label="Back to checklists"><ArrowLeft size={20} /></button>
         <div className="detail-title"><p className="eyebrow">Checklist</p><h1>{checklist.title}</h1></div>
-        <button className="secondary-button touch-button" onClick={onEdit}><Pencil size={16} />Edit</button>
+        <button className="secondary-button touch-button danger" disabled={deleting} onClick={onDelete} aria-label="Delete checklist"><Trash2 size={16} />Delete</button>
+        <button className="secondary-button touch-button" onClick={onEdit} aria-label="Edit checklist"><Pencil size={16} />Edit</button>
       </header>
       <div className="checklist-detail-layout">
         <article className="checklist-template-panel">
           {checklist.description ? <p className="checklist-description">{checklist.description}</p> : null}
           <div className="template-items">
-            {checklist.items.map((item) => <div className="template-item" key={item.id}><span className="empty-check" /><span>{item.label}</span></div>)}
+            {checklist.items.map((item) => <div className="template-item" key={item.id}><span className="empty-check" /><span>{item.label}</span><button className="icon-button danger delete-item" disabled={deleting} aria-label={`Delete ${item.label}`} onClick={() => onDeleteItem(item.id, item.label)}><Trash2 size={16} /></button></div>)}
           </div>
           {error ? <p className="inline-error">{error}</p> : null}
           <button className="run-button" type="button" onClick={onRun}><Play fill="currentColor" size={19} />Run this checklist</button>
@@ -207,12 +235,12 @@ function ChecklistDetail({ checklist, error, onBack, onEdit, onRun, onOpenRun }:
           {checklist.runs.length === 0 ? <p className="history-empty">No runs yet. Your completed and in-progress runs will appear here.</p> : null}
           <div className="history-list">
             {checklist.runs.map((run) => (
-              <button type="button" className="history-row" key={run.id} onClick={() => onOpenRun(run.id)}>
+              <div className="history-entry" key={run.id}><button type="button" className="history-row" onClick={() => onOpenRun(run.id)}>
                 <span className={run.completedAt ? "history-status complete" : "history-status"}>{run.completedAt ? <Check size={14} /> : <Play size={13} />}</span>
                 <span><strong>{run.completedAt ? "Completed" : "In progress"}</strong><small>{formatDateTime(run.completedAt ?? run.startedAt)}</small></span>
                 <span className="history-count">{run.checkedCount}/{run.itemCount}</span>
                 <ChevronRight size={16} />
-              </button>
+              </button><button className="icon-button danger" disabled={deleting} aria-label={`Delete run started ${formatDateTime(run.startedAt)}`} onClick={() => onDeleteRun(run.id)}><Trash2 size={16} /></button></div>
             ))}
           </div>
         </aside>
@@ -282,6 +310,16 @@ function ChecklistEditor({ checklist, onClose, onSave }: {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (checklist) {
+      const remaining = [...cleanItems];
+      const removed = checklist.items.filter((item) => {
+        const index = remaining.indexOf(item.label);
+        if (index < 0) return true;
+        remaining.splice(index, 1);
+        return false;
+      });
+      if (removed.length && !window.confirm(`Remove or replace ${removed.length} checklist item${removed.length === 1 ? "" : "s"}? Existing runs keep their items.`)) return;
+    }
     setSaving(true);
     setError("");
     try {

@@ -26,18 +26,22 @@ captureRouter.delete("/saved-items/:id", (req, res) => {
   res.status(204).end();
 });
 
-captureRouter.post("/share-attachments", express.raw({ type: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"], limit: "12mb" }), (req, res) => {
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "Missing image" });
-  let originalName = String(req.headers["x-file-name"] ?? "shared-image");
-  try { originalName = decodeURIComponent(originalName); } catch { originalName = "shared-image"; }
+captureRouter.post("/share-attachments", express.raw({ type: () => true, limit: "12mb" }), (req, res) => {
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "Missing file" });
+  let originalName = String(req.headers["x-file-name"] ?? "shared-file");
+  try { originalName = decodeURIComponent(originalName); } catch { originalName = "shared-file"; }
   const attachment = savePendingAttachment(userEmail(req), originalName.slice(0, 255), req.headers["content-type"]?.split(";")[0] ?? "", req.body);
-  if (!attachment) return res.status(415).json({ error: "Unsupported image type" });
+  if (!attachment) return res.status(415).json({ error: "Unsupported file type" });
   res.status(201).json({ attachment });
 });
 
 captureRouter.get("/saved-attachments/:id", (req, res) => {
   const attachment = getAttachment(userEmail(req), req.params.id);
-  if (!attachment || !fs.existsSync(attachment.path)) return res.status(404).json({ error: "Image not found" });
+  if (!attachment || !fs.existsSync(attachment.path)) return res.status(404).json({ error: "Attachment not found" });
+  const previewable = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"].includes(attachment.mimeType);
+  res.attachment(attachment.name);
+  if (previewable) res.setHeader("Content-Disposition", "inline");
+  res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Content-Type", attachment.mimeType);
   res.setHeader("Content-Length", attachment.size);
   res.setHeader("Cache-Control", "private, max-age=3600");

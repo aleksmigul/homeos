@@ -10,7 +10,7 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 release="$repo/.release"
 
 cd "$repo"
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --prod=false
 pnpm check
 pnpm build
 
@@ -20,6 +20,8 @@ pnpm --filter @homeos/api deploy --prod --legacy "$release/apps/api"
 rm -rf -- "$release/apps/api/src"
 rm -f -- "$release/apps/api/tsconfig.json"
 cp -a apps/web/dist "$release/apps/web/dist"
+
+node scripts/smoke-release.mjs "$release"
 
 echo "Prepared $release"
 echo "Activate it with: sudo ops/deploy.sh"

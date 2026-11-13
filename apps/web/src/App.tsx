@@ -1,20 +1,24 @@
-import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronRight, Code2, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, Mic, NotebookPen, Plane, Plus, Save, ShoppingCart, WifiOff, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bookmark, CalendarPlus, ChevronDown, ChevronRight, Code2, HardDrive, Inbox, ListChecks, ListTodo, Loader2, LogOut, Menu, Mic, NotebookPen, Pencil, Plane, Plus, Save, RefreshCw, ShoppingCart, Trash2, UserRound, WifiOff, X } from "lucide-react";
 import { FormEvent, TouchEvent as ReactTouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTravelPlanInput, TravelPlan, TravelPlanSummary, TravelRow } from "@homeos/shared";
-import { createTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listTravelPlans, logout, signInWithGoogle, updateTravelRow, warmOfflineCache, type AuthUser } from "./api";
-import { MarkdownNotesEditor } from "./components/MarkdownNotesEditor";
+import { createTravelPlan, deleteTravelPlan, getAuthConfig, getCurrentUser, getTravelPlan, listAuthAccounts, listTravelPlans, logout, signInWithGoogle, switchAccount, updateTravelRow, warmOfflineCache, warmTravelOfflineCache, type AuthUser } from "./api";
+import { RichNotes } from "./components/RichNotes";
+import { StackEditNotesEditor } from "./components/StackEditNotesEditor";
 import { ChecklistModule } from "./ChecklistModule";
 import { TravelInbox } from "./TravelInbox";
+import { TripEmails } from "./TripEmails";
 import { BookmarksModule, type SharedDraft } from "./SavedModule";
 import { currentNavigation, pushNavigation, replaceNavigation, type AppModule } from "./navigation";
 import { ShoppingModule } from "./ShoppingModule";
+import { WeekendModule } from "./WeekendModule";
 import { TodoModule } from "./TodoModule";
 import { DevModule } from "./DevModule";
+import { CodexTerminalModule } from "./CodexTerminalModule";
 import { VoiceNotesModule } from "./VoiceNotesModule";
-import { clearOfflineAccount, configureOfflineAccount, storagePressure } from "./offline";
+import { clearOfflineAccount, configureOfflineAccount, forceRefreshApp, offlineTravelSavedAt, storagePressure } from "./offline";
 
 const today = new Date().toISOString().slice(0, 10);
-const baseModules: AppModule[] = ["checklists", "todos", "shopping", "travel", "bookmarks", "voice-notes"];
+const baseModules: AppModule[] = ["checklists", "todos", "weekend", "shopping", "travel", "bookmarks", "voice-notes"];
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -23,7 +27,7 @@ export function App() {
   const [authError, setAuthError] = useState("");
 
   useEffect(() => {
-    Promise.all([getAuthConfig(), getCurrentUser().catch(() => null)])
+    Promise.all([getAuthConfig().catch(() => ({ googleClientId: "" })), getCurrentUser().catch(() => null)])
       .then(([config, current]) => {
         setClientId(config.googleClientId);
         setUser(current?.user ?? null);
@@ -35,34 +39,68 @@ export function App() {
   if (authLoading) return <AuthLoading />;
   if (!user) return <LoginPage clientId={clientId} error={authError} onError={setAuthError} onSignIn={setUser} />;
 
-  return <Planner user={user} onLogout={() => logout().then(clearOfflineAccount).then(() => setUser(null))} />;
+  return <Planner key={user.email} user={user} onUserChange={setUser} onLogout={() => logout().then(clearOfflineAccount).then(() => setUser(null))} />;
 }
 
-function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
+function Planner({ user, onUserChange, onLogout }: { user: AuthUser; onUserChange: (user: AuthUser) => void; onLogout: () => void }) {
   const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(() => readSharedDraft());
-  const [activeModule, setActiveModule] = useState<AppModule>(() => readSharedDraft() ? "bookmarks" : currentNavigation().module ?? "checklists");
+  const [activeModule, setActiveModule] = useState<AppModule>(() => {
+    const requested = readSharedDraft() ? "bookmarks" : currentNavigation().module ?? "checklists";
+    return (requested === "dev" || requested === "codex-terminal") && !user.developer ? "checklists" : requested;
+  });
   const [travelScreen, setTravelScreen] = useState<"library" | "inbox" | "plan">(() => currentNavigation().travelScreen ?? "library");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<TravelPlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<TravelPlan | null>(null);
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [editingRowId, setEditingRowId] = useState<string | null>(() => currentNavigation().travelRowId ?? null);
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState("Ready");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
+  const [travelOffline, setTravelOffline] = useState("Preparing offline copy…");
+  const [travelOfflineTime, setTravelOfflineTime] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [accounts, setAccounts] = useState<{ email: string }[]>([]);
+  const [accountError, setAccountError] = useState("");
   const titleSwipe = useRef<{ x: number; y: number } | null>(null);
-  const selectedRow = selectedPlan?.rows.find((row) => row.id === selectedRowId) ?? selectedPlan?.rows[0] ?? null;
-  const modules = user.developer ? [...baseModules, "dev" as const] : baseModules;
+  const modules = user.developer ? [...baseModules, "dev" as const, "codex-terminal" as const] : baseModules;
+
+  async function openAccountMenu() {
+    if (!user.developer) return;
+    const open = !accountMenuOpen;
+    setAccountMenuOpen(open);
+    setAccountError("");
+    if (open && user.developer && accounts.length === 0) {
+      try { setAccounts((await listAuthAccounts()).accounts); }
+      catch (error) { setAccountError(error instanceof Error ? error.message : "Could not load accounts"); }
+    }
+  }
+
+  async function selectAccount(email: string) {
+    if (email === user.email) { setAccountMenuOpen(false); return; }
+    setAccountError("");
+    try {
+      const { user: nextUser } = await switchAccount(email);
+      await clearOfflineAccount();
+      onUserChange(nextUser);
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : "Could not switch accounts");
+    }
+  }
 
   useEffect(() => {
     void bootstrap();
-    replaceNavigation({ module: activeModule, travelScreen }, window.location.pathname === "/share" ? "/" : undefined);
+    replaceNavigation({ module: activeModule, travelScreen });
     const onPopState = () => {
       const navigation = currentNavigation();
-      setActiveModule(navigation.module ?? "checklists");
+      setActiveModule((navigation.module === "dev" || navigation.module === "codex-terminal") && !user.developer ? "checklists" : navigation.module ?? "checklists");
       setTravelScreen(navigation.travelScreen ?? "library");
       setIsMobileMenuOpen(false);
+      setEditingRowId(navigation.travelRowId ?? null);
       if (navigation.travelScreen === "plan" && navigation.travelPlanId) void loadPlan(navigation.travelPlanId);
       else setSelectedPlan(null);
     };
@@ -71,12 +109,18 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   }, []);
 
   useEffect(() => {
+    let active = true;
     const sync = async () => {
+      if (!navigator.onLine) return;
       setIsOffline(false);
+      setTravelOffline("Downloading trips for offline use…");
       try {
-        await configureOfflineAccount(user.email);
-        await warmOfflineCache();
+        await configureOfflineAccount(user.email, user);
+        const savedAt = await warmTravelOfflineCache(user.email);
+        if (active) { setTravelOffline("Available offline"); setTravelOfflineTime(savedAt); }
+        void warmOfflineCache().catch(cause => console.warn("Other offline modules could not be fully updated", cause));
       } catch (cause) {
+        if (active) setTravelOffline("Offline download incomplete. Reopen online to retry.");
         console.warn("Offline snapshot could not be fully updated", cause);
       }
       const storage = await storagePressure().catch(() => null);
@@ -86,13 +130,31 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
     const online = () => void sync();
     window.addEventListener("offline", offline); window.addEventListener("online", online);
     navigator.serviceWorker?.addEventListener("controllerchange", online);
+    void offlineTravelSavedAt().then(savedAt => {
+      if (!active) return;
+      setTravelOfflineTime(savedAt);
+      if (!navigator.onLine) setTravelOffline(savedAt ? "Available offline" : "No complete offline copy saved yet.");
+    }).catch(() => { if (active) setTravelOffline("Offline storage is unavailable in this browser."); });
     if (navigator.onLine) void sync();
-    return () => { window.removeEventListener("offline", offline); window.removeEventListener("online", online); navigator.serviceWorker?.removeEventListener("controllerchange", online); };
+    return () => { active = false; window.removeEventListener("offline", offline); window.removeEventListener("online", online); navigator.serviceWorker?.removeEventListener("controllerchange", online); };
   }, [user.email]);
+
+  const offlineStatus = <small className="travel-offline-status" role="status" title={travelOfflineTime ? `Last complete download: ${new Date(travelOfflineTime).toLocaleString()}` : undefined}>{travelOffline}</small>;
+
+  async function refreshApp() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshError("");
+    try { await forceRefreshApp(); }
+    catch (cause) {
+      setRefreshError(cause instanceof Error ? cause.message : "Could not refresh the app.");
+      setRefreshing(false);
+    }
+  }
 
   function navigateModule(module: AppModule) {
     if (module !== activeModule || (module === "travel" && travelScreen !== "library")) {
-      pushNavigation({ module, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined, noteId: undefined, travelScreen: module === "travel" ? "library" : undefined, travelPlanId: undefined });
+      pushNavigation({ module, weekendHistory: undefined, checklist: undefined, imageId: undefined, emailId: undefined, dialog: undefined, todoListId: undefined, noteId: undefined, travelScreen: module === "travel" ? "library" : undefined, travelPlanId: undefined, travelRowId: undefined });
     }
     setActiveModule(module);
     if (module === "travel") { setTravelScreen("library"); setSelectedPlan(null); }
@@ -132,7 +194,7 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
 
   async function openTravelPlan(id: string) {
     await loadPlan(id);
-    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: id, emailId: undefined });
+    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: id, travelRowId: undefined, emailId: undefined });
     setTravelScreen("plan");
   }
 
@@ -151,21 +213,8 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   async function loadPlan(id: string) {
     const { travelPlan } = await getTravelPlan(id);
     setSelectedPlan(travelPlan);
-    setSelectedRowId(travelPlan.rows[0]?.id ?? null);
-  }
-
-  function replaceRow(row: TravelRow) {
-    setSelectedPlan((plan) => {
-      if (!plan) {
-        return plan;
-      }
-
-      return {
-        ...plan,
-        rows: plan.rows.map((item) => (item.id === row.id ? row : item)),
-        updatedAt: row.updatedAt
-      };
-    });
+    setExpandedRowIds(new Set());
+    setEditingRowId(currentNavigation().travelRowId ?? null);
   }
 
   function patchLocalRow(id: string, patch: Partial<TravelRow>) {
@@ -189,10 +238,12 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         hotel: row.hotel,
         notes: row.notes
       });
-      replaceRow(travelRow);
+      setSelectedPlan(plan => plan ? { ...plan, rows: plan.rows.map(item => item.id === row.id && item.theme === row.theme && item.hotel === row.hotel && item.notes === row.notes ? travelRow : item) } : plan);
       setStatus("Saved");
+      return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Save failed");
+      return false;
     }
   }
 
@@ -211,11 +262,28 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
       ...items
     ]);
     setSelectedPlan(travelPlan);
-    setSelectedRowId(travelPlan.rows[0]?.id ?? null);
-    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: travelPlan.id, emailId: undefined });
+    setExpandedRowIds(new Set());
+    setEditingRowId(currentNavigation().travelRowId ?? null);
+    pushNavigation({ module: "travel", travelScreen: "plan", travelPlanId: travelPlan.id, travelRowId: undefined, emailId: undefined });
     setTravelScreen("plan");
     setIsCreateOpen(false);
     setStatus("Created");
+  }
+
+  async function handleDeletePlan(plan: TravelPlan) {
+    if (!window.confirm(`Delete “${plan.title}”? This cannot be undone.`)) return;
+    setStatus("Deleting");
+    try {
+      await deleteTravelPlan(plan.id);
+      setPlans((items) => items.filter((item) => item.id !== plan.id));
+      setSelectedPlan(null);
+      setExpandedRowIds(new Set());
+      pushNavigation({ module: "travel", travelScreen: "library", travelPlanId: undefined, emailId: undefined });
+      setTravelScreen("library");
+      setStatus("Ready");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Delete failed");
+    }
   }
 
   return (
@@ -233,25 +301,39 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
           <nav className="module-nav" aria-label="Modules">
             <button className={activeModule === "checklists" ? "active" : ""} onClick={() => navigateModule("checklists")}><ListChecks size={17} /><span>Checklists</span></button>
             <button className={activeModule === "todos" ? "active" : ""} onClick={() => navigateModule("todos")}><ListTodo size={17} /><span>To-dos</span></button>
+            <button className={activeModule === "weekend" ? "active" : ""} onClick={() => navigateModule("weekend")}><CalendarPlus size={17} /><span>Weekends</span></button>
             <button className={activeModule === "shopping" ? "active" : ""} onClick={() => navigateModule("shopping")}><ShoppingCart size={17} /><span>Shopping</span></button>
             <button className={activeModule === "travel" ? "active" : ""} onClick={() => navigateModule("travel")}><Plane size={17} /><span>Travel</span></button>
             <button className={activeModule === "bookmarks" ? "active" : ""} onClick={() => navigateModule("bookmarks")}><Bookmark size={17} /><span>Bookmarks</span></button>
             <button className={activeModule === "voice-notes" ? "active" : ""} onClick={() => navigateModule("voice-notes")}><Mic size={17} /><span>Voice notes</span></button>
             {user.developer ? <button className={activeModule === "dev" ? "active" : ""} onClick={() => navigateModule("dev")}><Code2 size={17} /><span>Dev</span></button> : null}
+            {user.developer ? <button className={activeModule === "codex-terminal" ? "active" : ""} onClick={() => navigateModule("codex-terminal")}><Code2 size={17} /><span>Codex Terminal</span></button> : null}
           </nav>
         </div>
+        <div className="account-card-wrap">
+        <button className="app-refresh" type="button" aria-label={refreshing ? "Refreshing app" : "Force refresh app"} aria-busy={refreshing} disabled={refreshing || isOffline} onClick={() => void refreshApp()} title="Reload the latest app and shared data. Save any edits first."><RefreshCw size={17} className={refreshing ? "spin" : undefined} /><span>{refreshing ? "Refreshing…" : "Force refresh"}</span></button>
+        {refreshError ? <p className="account-menu-error app-refresh-error" role="alert">{refreshError}</p> : null}
+        {accountMenuOpen ? <div className="account-menu">
+          <p>Debug as</p>
+          {accounts.map((account) => <button className={account.email === user.email ? "active" : ""} type="button" key={account.email} onClick={() => void selectAccount(account.email)}><UserRound size={15} /><span>{account.email}</span>{account.email === user.email ? <small>Current</small> : null}</button>)}
+          {accountError ? <div className="account-menu-error">{accountError}</div> : null}
+        </div> : null}
         <div className="account-card">
-          {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : null}
+          <button className="account-identity" type="button" aria-label={user.developer ? "Switch account" : "Account"} aria-expanded={user.developer ? accountMenuOpen : undefined} disabled={!user.developer} onClick={() => void openAccountMenu()}>
+          {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : <span className="account-avatar"><UserRound size={17} /></span>}
           <span><strong>{user.name}</strong><small>{user.email}</small></span>
-          <button type="button" aria-label="Sign out" onClick={onLogout}><LogOut size={16} /></button>
+          {user.developer ? <ChevronDown size={14} /> : null}
+          </button>
+          <button className="account-logout" type="button" aria-label="Sign out" onClick={onLogout}><LogOut size={16} /></button>
+        </div>
         </div>
       </aside>
 
-      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "bookmarks" ? <BookmarksModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : activeModule === "voice-notes" ? <VoiceNotesModule /> : activeModule === "dev" ? <DevModule /> : <section className="workspace travel-workspace">
+      {activeModule === "checklists" ? <ChecklistModule /> : activeModule === "todos" ? <TodoModule /> : activeModule === "weekend" ? <WeekendModule /> : activeModule === "shopping" ? <ShoppingModule /> : activeModule === "bookmarks" ? <BookmarksModule sharedDraft={sharedDraft} onSharedDraftDone={() => setSharedDraft(null)} /> : activeModule === "voice-notes" ? <VoiceNotesModule /> : activeModule === "dev" ? <DevModule /> : activeModule === "codex-terminal" && user.developer ? <CodexTerminalModule /> : <section className="workspace travel-workspace">
         {travelScreen === "library" ? <>
           <header className="topbar checklist-topbar">
-            <div><p className="eyebrow">Trips & reservations</p><h1>Travel</h1></div>
-            <button className="primary-button add-action" type="button" onClick={() => setIsCreateOpen(true)}><Plus size={17} /><span>New trip</span></button>
+            <div><p className="eyebrow">Trips & reservations</p><h1>Travel</h1>{offlineStatus}</div>
+            <button className="primary-button add-action" type="button" disabled={isOffline} onClick={() => setIsCreateOpen(true)}><Plus size={17} /><span>New trip</span></button>
           </header>
           <div className="travel-library">
             <button className="travel-inbox-card" type="button" onClick={openTravelInbox}>
@@ -275,25 +357,29 @@ function Planner({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
         </> : travelScreen === "inbox" ? <>
           <header className="topbar detail-topbar travel-detail-topbar">
             <button className="icon-button" type="button" aria-label="Back to travel" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
-            <div className="detail-title"><p className="eyebrow">Travel</p><h1>Inbox</h1></div>
+            <div className="detail-title"><p className="eyebrow">Travel</p><h1>Inbox</h1>{offlineStatus}</div>
           </header>
           <TravelInbox />
         </> : selectedPlan ? <>
           <header className="topbar detail-topbar travel-detail-topbar">
             <button className="icon-button" type="button" aria-label="Back to travel" onClick={() => window.history.back()}><ArrowLeft size={20} /></button>
-            <div className="detail-title"><p>{formatDate(selectedPlan.startDate)} – {formatDate(selectedPlan.endDate)}</p><h1>{selectedPlan.title}</h1></div>
-            <div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div>
+            <div className="detail-title"><p>{formatDate(selectedPlan.startDate)} – {formatDate(selectedPlan.endDate)}</p><h1>{selectedPlan.title}</h1>{offlineStatus}</div>
+            <div className="travel-plan-actions">
+              <button className="icon-button danger" type="button" disabled={isOffline} aria-label={`Delete ${selectedPlan.title}`} title="Delete trip" onClick={() => void handleDeletePlan(selectedPlan)}><Trash2 size={18} /></button>
+              <div className="status-pill">{isLoading ? <Loader2 className="spin" size={14} /> : <Save size={14} />}{status}</div>
+            </div>
           </header>
-          <div className="planner-grid">
-            <TravelTable
-              rows={selectedPlan.rows}
-              selectedRowId={selectedRow?.id ?? null}
-              onSelect={setSelectedRowId}
-              onLocalChange={patchLocalRow}
-              onSave={saveRow}
-            />
-            <RowPage row={selectedRow} onChange={patchLocalRow} onSave={saveRow} />
-          </div>
+          {editingRowId && !isOffline ? <RowPage key={editingRowId} row={selectedPlan.rows.find(row => row.id === editingRowId) ?? null} onChange={patchLocalRow} onSave={saveRow} onClose={() => { setEditingRowId(null); replaceNavigation({ travelRowId: undefined }); }} /> : <>
+            <TravelTable rows={selectedPlan.rows} expandedRowIds={expandedRowIds} readOnly={isOffline}
+              onToggle={id => setExpandedRowIds(current => {
+                const next = new Set(current);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                return next;
+              })}
+              onToggleAll={expand => setExpandedRowIds(new Set(expand ? selectedPlan.rows.map(row => row.id) : []))}
+              onEdit={id => { setEditingRowId(id); pushNavigation({ travelRowId: id }); window.scrollTo(0, 0); }} />
+            <TripEmails key={selectedPlan.id} planId={selectedPlan.id} />
+          </>}
         </> : null}
       </section>}
 
@@ -358,77 +444,52 @@ function LoginPage({ clientId, error, onError, onSignIn }: {
         <p className="eyebrow">Welcome home</p>
         <h1>The Annexation</h1>
         <p className="login-copy">Sign in with an approved Google account.</p>
-        {clientId ? <div ref={buttonRef} className="google-button" /> : <p className="auth-error">Google Sign-In still needs its client ID.</p>}
+        {clientId ? <div ref={buttonRef} className="google-button" /> : <p className="auth-error">{navigator.onLine ? "Google Sign-In still needs its client ID." : "Connect to the internet to sign in and download trips."}</p>}
         {error ? <p className="auth-error">{error}</p> : null}
       </section>
     </main>
   );
 }
 
-function TravelTable({
-  rows,
-  selectedRowId,
-  onSelect,
-  onLocalChange,
-  onSave
-}: {
-  rows: TravelRow[];
-  selectedRowId: string | null;
-  onSelect: (id: string) => void;
-  onLocalChange: (id: string, patch: Partial<TravelRow>) => void;
-  onSave: (row: TravelRow) => Promise<void>;
+function TravelTable({ rows, expandedRowIds, readOnly, onToggle, onToggleAll, onEdit }: {
+  rows: TravelRow[]; expandedRowIds: ReadonlySet<string>; onToggle: (id: string) => void;
+  readOnly: boolean;
+  onToggleAll: (expand: boolean) => void; onEdit: (id: string) => void;
 }) {
-  return (
-    <section className="table-wrap" aria-label="Travel itinerary table">
-      <div className="table-header row">
-        <span>Date</span>
-        <span>Theme</span>
-        <span>Hotel</span>
-        <span />
-      </div>
-      {rows.map((row) => (
-        <button
-          className={row.id === selectedRowId ? "itinerary-row row selected" : "itinerary-row row"}
-          key={row.id}
-          type="button"
-          onClick={() => onSelect(row.id)}
-        >
-          <span className="date-cell">
-            <strong>{formatWeekday(row.date)}</strong>
-            <small>{formatDate(row.date)}</small>
-          </span>
-          <input
-            aria-label={`Theme for ${row.date}`}
-            value={row.theme}
-            placeholder="Theme"
-            onChange={(event) => onLocalChange(row.id, { theme: event.target.value })}
-            onBlur={() => void onSave(row)}
-            onClick={(event) => event.stopPropagation()}
-          />
-          <input
-            aria-label={`Hotel for ${row.date}`}
-            value={row.hotel}
-            placeholder="Hotel"
-            onChange={(event) => onLocalChange(row.id, { hotel: event.target.value })}
-            onBlur={() => void onSave(row)}
-            onClick={(event) => event.stopPropagation()}
-          />
-          <ChevronRight size={16} />
+  const allExpanded = rows.length > 0 && rows.every(row => expandedRowIds.has(row.id));
+  return <section className="table-wrap" aria-label="Travel itinerary table">
+    <div className="itinerary-controls">
+      <h2>Itinerary</h2>
+      <button type="button" className="secondary-button" aria-expanded={allExpanded} aria-controls="travel-days" disabled={!rows.length} onClick={() => onToggleAll(!allExpanded)}>
+        {allExpanded ? <ChevronRight size={16} /> : <ChevronDown size={16} />}{allExpanded ? "Collapse all days" : "Expand all days"}
+      </button>
+    </div>
+    <div className="table-header row"><span>Date</span><span>Theme</span><span /></div>
+    <div id="travel-days">{rows.map(row => <div key={row.id} className="itinerary-day">
+      <div className={expandedRowIds.has(row.id) ? "itinerary-row row selected" : "itinerary-row row"}>
+        <span className="date-cell"><strong>{formatWeekday(row.date)}</strong><small>{formatDate(row.date)}</small></span>
+        <button type="button" className="day-theme" aria-expanded={expandedRowIds.has(row.id)} aria-controls={`notes-${row.id}`} onClick={() => onToggle(row.id)}>
+          {expandedRowIds.has(row.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<span>{row.theme || "View day details"}</span>
         </button>
-      ))}
-    </section>
-  );
+        <button type="button" className="day-edit" disabled={readOnly} aria-label={`Edit day ${row.date}`} title="Edit day" onClick={() => onEdit(row.id)}><Pencil size={14} aria-hidden="true" /></button>
+      </div>
+      {expandedRowIds.has(row.id) && <div className="day-details" id={`notes-${row.id}`}><p className="day-hotel"><strong>Hotel:</strong> {row.hotel || "—"}</p><RichNotes value={row.notes} /></div>}
+    </div>)}</div>
+  </section>;
 }
 
 function RowPage({
   row,
   onChange,
-  onSave
+  onSave,
+  onClose
 }: {
   row: TravelRow | null;
   onChange: (id: string, patch: Partial<TravelRow>) => void;
-  onSave: (row: TravelRow) => Promise<void>;
+  onSave: (row: TravelRow) => Promise<boolean>;
+  onClose: () => void;
 }) {
+  const [editingNotes, setEditingNotes] = useState(false);
   if (!row) {
     return (
       <aside className="row-page">
@@ -438,14 +499,15 @@ function RowPage({
   }
 
   return (
-    <aside className="row-page">
+    <aside className="row-page travel-day-editor">
+      <button className="secondary-button" type="button" disabled={editingNotes} onClick={onClose}><ArrowLeft size={16} /> Back to itinerary</button>
       <div className="row-page-title">
         <CalendarPlus size={18} />
         <div>
           <p>
             {formatWeekday(row.date)}, {formatDate(row.date)}
           </p>
-          <h2>{row.theme || "Untitled day"}</h2>
+          <h2>Edit day</h2>
         </div>
       </div>
       <label>
@@ -468,10 +530,12 @@ function RowPage({
       </label>
       <div className="notes-label">
         <span className="field-label">Notes</span>
-        <MarkdownNotesEditor
+        <StackEditNotesEditor
+          key={row.id}
+          onBusyChange={setEditingNotes}
           value={row.notes}
           onChange={(notes) => onChange(row.id, { notes })}
-          onCommit={(notes) => void onSave({ ...row, notes })}
+          onCommit={async (notes) => { if (await onSave({ ...row, notes }) === false) throw new Error("Could not save notes. Please retry."); }}
         />
       </div>
     </aside>

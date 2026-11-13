@@ -78,6 +78,15 @@ export function writeTransaction(callback: () => void) {
 
 function migrate() {
   getDb().run(`
+    CREATE TABLE IF NOT EXISTS weekend_chores (
+      id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      day TEXT,
+      position INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS travel_plans (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -218,8 +227,6 @@ function migrate() {
       expires_at TEXT NOT NULL
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_one_current
-      ON shopping_lists(status) WHERE status = 'current';
     CREATE INDEX IF NOT EXISTS idx_shopping_items_order
       ON shopping_items(list_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_shopping_archived
@@ -248,6 +255,23 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_todos_owner_completed
       ON todos(owner_email, completed_at DESC);
 
+    CREATE TABLE IF NOT EXISTS voice_notes (
+      id TEXT PRIMARY KEY,
+      owner_email TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      duration_seconds INTEGER NOT NULL,
+      mime_type TEXT NOT NULL,
+      stored_name TEXT NOT NULL UNIQUE,
+      size INTEGER NOT NULL,
+      transcription_status TEXT NOT NULL CHECK(transcription_status IN ('pending', 'processing', 'complete', 'failed')),
+      transcript TEXT,
+      transcription_error TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_voice_notes_owner_created
+      ON voice_notes(owner_email, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS shared_notes (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -268,6 +292,7 @@ function migrate() {
   migrateTodoLists();
   migrateTodoSharing();
   migrateCodexRequests();
+  getDb().run("DROP INDEX IF EXISTS idx_shopping_one_current");
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_capture_streams_owner_name ON capture_streams(owner_email, name COLLATE NOCASE)");
   getDb().run("CREATE INDEX IF NOT EXISTS idx_todo_lists_owner_updated ON todo_lists(owner_email, updated_at DESC)");
   getDb().run("CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_lists_one_shared ON todo_lists(is_shared) WHERE is_shared = 1");

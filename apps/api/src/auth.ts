@@ -7,7 +7,8 @@ const googleClient = new OAuth2Client();
 const cookieName = "homeos_session";
 const sessionLifetimeSeconds = 60 * 60 * 24 * 14;
 
-type Session = { email: string; name: string; picture?: string; exp: number };
+type SessionIdentity = { email: string; name: string; picture?: string };
+type Session = SessionIdentity & { administrator?: SessionIdentity; exp: number };
 
 function encode(value: string) {
   return Buffer.from(value).toString("base64url");
@@ -48,7 +49,14 @@ export function getAuthenticatedUser(req: Request) {
   const session = readSession(req);
   return session ? { email: session.email, name: session.name, picture: session.picture } : null;
 }
-export function isDeveloper(req: Request) { return Boolean(config.devPanelEmail && readSession(req)?.email === config.devPanelEmail); }
+export function isDeveloper(req: Request) {
+  const session = readSession(req);
+  return Boolean(config.devPanelEmail && (session?.administrator?.email ?? session?.email) === config.devPanelEmail);
+}
+
+function publicUser(session: Session) {
+  return { email: session.email, name: session.name, picture: session.picture, developer: Boolean(config.devPanelEmail && (session.administrator?.email ?? session.email) === config.devPanelEmail) };
+}
 
 function sessionCookie(value: string, maxAge = sessionLifetimeSeconds) {
   return [
@@ -70,7 +78,30 @@ authRouter.get("/auth/config", (_req, res) => {
 authRouter.get("/auth/me", (req, res) => {
   const user = readSession(req);
   if (!user) return res.status(401).json({ error: "Authentication required" });
-  res.json({ user: { email: user.email, name: user.name, picture: user.picture, developer: user.email === config.devPanelEmail } });
+  res.json({ user: publicUser(user) });
+});
+
+authRouter.get("/auth/accounts", (req, res) => {
+  const session = readSession(req);
+  if (!session) return res.status(401).json({ error: "Authentication required" });
+  if (!config.devPanelEmail || (session.administrator?.email ?? session.email) !== config.devPanelEmail) return res.status(403).json({ error: "Administrator access required" });
+  res.json({ accounts: config.allowedEmails.map((email) => ({ email })) });
+});
+
+authRouter.post("/auth/switch-account", (req, res) => {
+  const session = readSession(req);
+  if (!session) return res.status(401).json({ error: "Authentication required" });
+  const administrator = session.administrator ?? { email: session.email, name: session.name, picture: session.picture };
+  if (!config.devPanelEmail || administrator.email !== config.devPanelEmail) return res.status(403).json({ error: "Administrator access required" });
+
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  if (!config.allowedEmails.includes(email)) return res.status(400).json({ error: "Account is not configured" });
+  const switched: Omit<Session, "exp"> = email === administrator.email
+    ? administrator
+    : { email, name: email, administrator };
+  const nextSession = { ...switched, exp: Math.floor(Date.now() / 1000) + sessionLifetimeSeconds };
+  res.setHeader("Set-Cookie", sessionCookie(createSession(switched)));
+  res.json({ user: publicUser(nextSession) });
 });
 
 authRouter.post("/auth/google", async (req, res) => {

@@ -19,13 +19,20 @@ function ensureCurrent() {
   return current!;
 }
 
-function getItems(listId: string) { return all<ItemRow>("SELECT id, list_id, label, is_checked, sort_order, added_by, checked_at FROM shopping_items WHERE list_id = $id ORDER BY sort_order", { $id: listId }).map(mapItem); }
+function getItems(listId: string) { return all<ItemRow>("SELECT id, list_id, label, is_checked, sort_order, added_by, checked_at FROM shopping_items WHERE list_id = $id ORDER BY is_checked, sort_order", { $id: listId }).map(mapItem); }
 function fullList(row: ListRow): ShoppingList { return { ...mapSummary(row), items: getItems(row.id) }; }
 
 export function getShoppingOverview() {
-  const current = fullList(ensureCurrent());
+  ensureCurrent();
+  const current = all<ListRow>(`${listSelect} WHERE l.status = 'current' GROUP BY l.id ORDER BY l.created_at`).map(fullList);
   const archived = all<ListRow>(`${listSelect} WHERE l.status = 'archived' GROUP BY l.id ORDER BY l.archived_at DESC`).map(mapSummary);
   return { current, archived };
+}
+
+export function createShoppingList(title: string) {
+  const id = randomUUID(); const now = new Date().toISOString();
+  writeTransaction(() => run("INSERT INTO shopping_lists (id, title, status, created_at) VALUES ($id, $title, 'current', $now)", { $id: id, $title: title, $now: now }));
+  return getShoppingList(id)!;
 }
 
 export function getShoppingList(id: string) { const row = get<ListRow>(`${listSelect} WHERE l.id = $id GROUP BY l.id`, { $id: id }); return row ? fullList(row) : null; }
@@ -38,10 +45,54 @@ export function setShoppingItemChecked(id: string, checked: boolean) {
   return mapItem({ ...row, is_checked: checked ? 1 : 0, checked_at: checkedAt });
 }
 
+export function addShoppingItems(labels: string[], addedBy: string): { shoppingList: ShoppingList; addedItems: ShoppingItem[]; skippedCount: number };
+export function addShoppingItems(labels: string[], addedBy: string, listId: string, atTop?: boolean): { shoppingList: ShoppingList; addedItems: ShoppingItem[]; skippedCount: number } | null;
+export function addShoppingItems(labels: string[], addedBy: string, listId?: string, atTop = false) {
+  const current = listId ? get<ListRow>(`${listSelect} WHERE l.id = $id AND l.status = 'current' GROUP BY l.id`, { $id: listId }) : ensureCurrent();
+  if (!current) return null;
+  const existing = getItems(current.id);
+  const seen = new Set(existing.map((item) => item.label.trim().toLocaleLowerCase()));
+  const additions = labels.filter((label) => {
+    const key = label.trim().toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const addedItems: ShoppingItem[] = [];
+  writeTransaction(() => {
+    if (atTop && additions.length) run("UPDATE shopping_items SET sort_order = sort_order + $count WHERE list_id = $id", { $count: additions.length, $id: current.id });
+    additions.forEach((label, offset) => {
+    const row: ItemRow = {
+      id: randomUUID(),
+      list_id: current.id,
+      label,
+      is_checked: 0,
+      sort_order: atTop ? offset : existing.length + offset,
+      added_by: addedBy,
+      checked_at: null
+    };
+    run("INSERT INTO shopping_items (id, list_id, label, is_checked, sort_order, added_by, created_at) VALUES ($id, $listId, $label, 0, $order, $addedBy, $now)", {
+      $id: row.id,
+      $listId: row.list_id,
+      $label: row.label,
+      $order: row.sort_order,
+      $addedBy: row.added_by,
+      $now: new Date().toISOString()
+    });
+    addedItems.push(mapItem(row));
+    });
+  });
+
+  return { shoppingList: getShoppingList(current.id)!, addedItems, skippedCount: labels.length - additions.length };
+}
+
 export class ShoppingLockedError extends Error { constructor(public ownerName: string, public expiresAt: string) { super(`${ownerName} is editing this list`); } }
 const lockExpiry = () => new Date(Date.now() + 2 * 60 * 1000).toISOString();
-export function acquireShoppingLock(email: string, name: string): ShoppingEditLock {
-  const list = ensureCurrent(); const now = new Date().toISOString();
+export function acquireShoppingLock(email: string, name: string, listId?: string): ShoppingEditLock {
+  const list = listId ? get<ListRow>(`${listSelect} WHERE l.id = $id AND l.status = 'current' GROUP BY l.id`, { $id: listId }) : ensureCurrent();
+  if (!list) throw new Error("Shopping list not found");
+  const now = new Date().toISOString();
   const existing = get<LockRow>("SELECT token, owner_email, owner_name, expires_at FROM shopping_edit_locks WHERE list_id = $id", { $id: list.id });
   if (existing && existing.expires_at > now && existing.owner_email !== email) throw new ShoppingLockedError(existing.owner_name, existing.expires_at);
   const token = randomUUID(); const expiresAt = lockExpiry();
@@ -50,8 +101,10 @@ export function acquireShoppingLock(email: string, name: string): ShoppingEditLo
 }
 
 function requireLock(email: string, token: string) {
-  const current = ensureCurrent(); const lock = get<LockRow>("SELECT token, owner_email, owner_name, expires_at FROM shopping_edit_locks WHERE list_id = $id", { $id: current.id });
+  const lock = get<LockRow & { list_id: string }>("SELECT list_id, token, owner_email, owner_name, expires_at FROM shopping_edit_locks WHERE token = $token", { $token: token });
   if (!lock || lock.owner_email !== email || lock.token !== token || lock.expires_at <= new Date().toISOString()) throw new ShoppingLockedError(lock?.owner_name ?? "Someone else", lock?.expires_at ?? new Date().toISOString());
+  const current = get<ListRow>(`${listSelect} WHERE l.id = $id AND l.status = 'current' GROUP BY l.id`, { $id: lock.list_id });
+  if (!current) throw new Error("Shopping list not found");
   return current;
 }
 
@@ -83,7 +136,7 @@ export function importShoppingItems(email: string, token: string, sourceId: stri
 }
 
 export function archiveCurrentShoppingList(email: string, token: string) {
-  const current = requireLock(email, token); const now = new Date().toISOString(); const nextId = randomUUID();
-  writeTransaction(() => { run("UPDATE shopping_lists SET status = 'archived', archived_at = $now WHERE id = $id", { $now: now, $id: current.id }); run("DELETE FROM shopping_edit_locks WHERE list_id = $id", { $id: current.id }); run("INSERT INTO shopping_lists (id, title, status, created_at) VALUES ($id, 'Shopping list', 'current', $now)", { $id: nextId, $now: now }); });
-  return getShoppingList(nextId)!;
+  const current = requireLock(email, token); const now = new Date().toISOString();
+  writeTransaction(() => { run("UPDATE shopping_lists SET status = 'archived', archived_at = $now WHERE id = $id", { $now: now, $id: current.id }); run("DELETE FROM shopping_edit_locks WHERE list_id = $id", { $id: current.id }); });
+  return getShoppingList(current.id)!;
 }

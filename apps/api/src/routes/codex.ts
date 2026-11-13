@@ -1,6 +1,6 @@
 import crypto from "node:crypto"; import { Router } from "express"; import { z } from "zod"; import { isDeveloper } from "../auth.js"; import { config } from "../config.js"; import { claimCodexRequest,createCodexRequest,createDeployRequest,createPushRequest,finishCodexRequest,listCodexRequests,retryCodexRequest } from "../codexRepository.js";
 export const codexRouter=Router(),codexWorkerRouter=Router();
-codexRouter.use((req,res,next)=>isDeveloper(req)?next():res.status(404).json({error:"Not found"}));
+codexRouter.use("/dev",(req,res,next)=>isDeveloper(req)?next():res.status(404).json({error:"Not found"}));
 codexRouter.get("/dev/codex-requests",(_req,res)=>res.json({requests:listCodexRequests()}));
 codexRouter.post("/dev/codex-requests",(req,res,next)=>{try{res.status(201).json({request:createCodexRequest(z.object({prompt:z.string().trim().min(1).max(20000)}).parse(req.body).prompt)});}catch(e){next(e);}});
 codexRouter.post("/dev/deploy",(_req,res)=>res.status(201).json({request:createDeployRequest()}));

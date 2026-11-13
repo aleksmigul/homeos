@@ -2,6 +2,10 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./styles.css";
+import { installDeployRefresh } from "./deployRefresh";
+
+declare const __BUILD_VERSION__: string;
+if (__BUILD_VERSION__ !== "development") installDeployRefresh(__BUILD_VERSION__);
 
 declare global {
   interface Window {
@@ -16,8 +20,8 @@ declare global {
   }
 }
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
+if (__BUILD_VERSION__ !== "development" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(error => console.warn("Offline app installation failed", error)));
 }
 
 createRoot(document.getElementById("root")!).render(
