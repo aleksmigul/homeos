@@ -5,6 +5,7 @@ import { addWeekendChore, changeWeekendChore, getWeekendChores, removeWeekendCho
 import { currentNavigation, pushNavigation } from "./navigation";
 
 const labelDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+const historyDay = (chore: WeekendChore) => chore.day ?? dateKey(new Date(chore.completedAt!));
 
 export function WeekendModule() {
   const [chores, setChores] = useState<WeekendChore[]>([]);
@@ -34,8 +35,8 @@ export function WeekendModule() {
   function navigate(showHistory: boolean) { pushNavigation({ module: "weekend", weekendHistory: showHistory }); setHistory(showHistory); }
   const open = chores.filter(c => !c.completedAt);
   const days = weekendBuckets(open, new Date(`${today}T12:00:00`));
-  const completed = chores.filter(c => c.completedAt).sort((a, b) => b.completedAt!.localeCompare(a.completedAt!));
-  const groups = [...new Set(completed.map(c => dateKey(new Date(c.completedAt!))))];
+  const completed = chores.filter(c => c.completedAt).sort((a, b) => historyDay(b).localeCompare(historyDay(a)) || a.position - b.position);
+  const groups = [...new Set(completed.map(historyDay))];
   const move = (id: string, day: string | null, beforeId?: string) => { if (id !== beforeId) void mutate(() => changeWeekendChore(id, { action: "move", day, beforeId })); };
   function drop(event: DragEvent, day: string | null, beforeId?: string) {
     event.preventDefault(); event.stopPropagation();
@@ -74,7 +75,15 @@ export function WeekendModule() {
     <div className="weekend-content">
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       <p className="weekend-hint" role="status">{loading ? "Loading activities…" : busy ? "Saving…" : history ? `${completed.length} activities completed` : "Drag activities into a day and rearrange them. Use the menu and up button on touchscreens or with a keyboard."}</p>
-      {!loading && (history ? <>{!completed.length ? <div className="empty-state"><h2>A fresh start</h2><p>Finished activities and their completion dates will appear here.</p></div> : groups.map(day => <section className="weekend-bucket" key={day}><h2>{labelDay(day)}</h2><ul className="weekend-chore-list">{completed.filter(c => dateKey(new Date(c.completedAt!)) === day).map(c => <li className="weekend-history-row" key={c.id}><Check size={18} /><div><strong>{c.text}</strong><p>Done {new Date(c.completedAt!).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}{c.day ? ` · Planned for ${labelDay(c.day)}` : " · Unscheduled"}</p></div></li>)}</ul></section>)}</> : <>
+      {!loading && (history ? <>
+        {!completed.length ? <div className="empty-state"><h2>A fresh start</h2><p>Finished activities will appear under their scheduled dates.</p></div> : groups.map(day => <section className="weekend-bucket" key={day}>
+          <h2>{labelDay(day)}</h2>
+          <ul className="weekend-chore-list">{completed.filter(c => historyDay(c) === day).map(c => <li className="weekend-history-row" key={c.id}>
+            <Check size={18} />
+            <div><strong>{c.text}</strong><p>{c.day ? `Planned for ${labelDay(c.day)}` : `Unscheduled · Marked complete ${new Date(c.completedAt!).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`}</p></div>
+          </li>)}</ul>
+        </section>)}
+      </> : <>
         <div className="weekend-days">{days.map(day => bucket(day))}</div>
         {bucket(null)}
         <form className="todo-add" onSubmit={event => void add(event)}><label htmlFor="weekend-new-chore">Add an activity</label><div><input id="weekend-new-chore" value={text} maxLength={500} disabled={busy} onChange={event => setText(event.target.value)} placeholder="What would you like to do?" /><button className="primary-button" disabled={busy || !text.trim()}><Plus size={18} />Add</button></div></form>
